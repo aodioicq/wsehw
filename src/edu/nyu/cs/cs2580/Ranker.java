@@ -45,6 +45,14 @@ class Ranker {
 		sortScoredDocuments(retrieval_results);
 		return retrieval_results;
 	}
+	public Vector<ScoredDocument> runquery5(String query) {
+		Vector<ScoredDocument> retrieval_results = new Vector<ScoredDocument>();
+		for (int i = 0; i < _index.numDocs(); ++i) {
+				retrieval_results.add(simpleLinearModel(query, i));
+		}
+		sortScoredDocuments(retrieval_results);
+		return retrieval_results;
+	}
 
 
 
@@ -239,7 +247,6 @@ class Ranker {
 		Vector<String> db = d.get_body_vector();
 		for(int i=0;i<qv.size()-1;++i){
 			String bigram=qv.get(i)+" "+qv.get(i+1);
-			System.out.print(bigram);
 			for(int j=0;j<db.size()-1;++j){
 				String docbigram=db.get(j)+" "+db.get(j+1);
 				if(bigram.equals(docbigram)){
@@ -248,6 +255,16 @@ class Ranker {
 			}
 		}
 		return new ScoredDocument(did, d.get_title_string(), matches);
+	}
+	
+	public ScoredDocument simpleLinearModel(String query, int did){
+		Document d = _index.getDoc(did);
+		double cosine=cosineSimilarity(query, did)._score;
+		double ql=queryLikelihood(query, did)._score;
+		double phrase=phraseRanker(query, did)._score;
+		double numviews=numViews(query, did)._score;
+		double score=cosine+ql+phrase+numviews;
+		return new ScoredDocument(did, d.get_title_string(), score);
 	}
 
 	private void sortScoredDocuments(Vector<ScoredDocument> retrieval_results) {
