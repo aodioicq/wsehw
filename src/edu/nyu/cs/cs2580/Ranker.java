@@ -29,6 +29,14 @@ class Ranker {
 		sortScoredDocuments(retrieval_results);
 		return retrieval_results;
 	}
+	public Vector<ScoredDocument> runquery3(String query) {
+		Vector<ScoredDocument> retrieval_results = new Vector<ScoredDocument>();
+		for (int i = 0; i < _index.numDocs(); ++i) {
+				retrieval_results.add(phraseRanker(query, i));
+		}
+		sortScoredDocuments(retrieval_results);
+		return retrieval_results;
+	}
 	public Vector<ScoredDocument> runquery4(String query) {
 		Vector<ScoredDocument> retrieval_results = new Vector<ScoredDocument>();
 		for (int i = 0; i < _index.numDocs(); ++i) {
@@ -44,12 +52,7 @@ class Ranker {
 	public ScoredDocument cosineSimilarity(String query, int did) {
 
 		// Build query vector
-		Scanner s = new Scanner(query);
-		Vector<String> qv = new Vector<String>();
-		while (s.hasNext()) {
-			String term = s.next();
-			qv.add(term);
-		}
+		Vector<String> qv = queryVector(query);
 
 		// Get the document vector. For hw1, you don't have to worry about the
 		// details of how index works.
@@ -95,12 +98,7 @@ class Ranker {
 	public ScoredDocument queryLikelihood(String query, int did) {
 
 		// Build query vector
-		Scanner s = new Scanner(query);
-		Vector<String> qv = new Vector<String>();
-		while (s.hasNext()) {
-			String term = s.next();
-			qv.add(term);
-		}
+		Vector<String> qv = queryVector(query);
 
 		// Get the document vector. For hw1, you don't have to worry about the
 		// details of how index works.
@@ -154,6 +152,16 @@ class Ranker {
 		return new ScoredDocument(did, d.get_title_string(), score);
 	}
 
+	private Vector<String> queryVector(String query){
+		Scanner s = new Scanner(query);
+		Vector<String> qv = new Vector<String>();
+		while (s.hasNext()) {
+			String term = s.next();
+			qv.add(term);
+		}
+		return qv;
+	}
+	
 	private double calculateCosine(Vector<Integer> db_freq,
 			Vector<Integer> qv_freq) {
 		// Calculates the cosine similarity ////////////////////////////////
@@ -222,6 +230,24 @@ class Ranker {
 		Document d = _index.getDoc(did);
     	int numviews=d.get_numviews();
     	return new ScoredDocument(did, d.get_title_string(), numviews);
+	}
+	
+	public ScoredDocument phraseRanker(String query, int did){
+		int matches=0;
+		Document d = _index.getDoc(did);
+		Vector<String> qv = queryVector(query);
+		Vector<String> db = d.get_body_vector();
+		for(int i=0;i<qv.size()-1;++i){
+			String bigram=qv.get(i)+" "+qv.get(i+1);
+			System.out.print(bigram);
+			for(int j=0;j<db.size()-1;++j){
+				String docbigram=db.get(j)+" "+db.get(j+1);
+				if(bigram.equals(docbigram)){
+					matches++;
+				}
+			}
+		}
+		return new ScoredDocument(did, d.get_title_string(), matches);
 	}
 
 	private void sortScoredDocuments(Vector<ScoredDocument> retrieval_results) {
