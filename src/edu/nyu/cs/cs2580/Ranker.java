@@ -214,6 +214,12 @@ class Ranker {
     	int numviews=d.get_numviews();
     	return new ScoredDocument(did, d.get_title_string(), numviews);
 	}
+	
+	public ScoredDocument (String query, int did) {
+		Document d = _index.getDoc(did);
+    	int numviews=d.get_numviews();
+    	return new ScoredDocument(did, d.get_title_string(), numviews);
+	}
 
 	private void sortScoredDocuments(Vector<ScoredDocument> retrieval_results) {
 		Collections.sort(retrieval_results,new ScoredDocumentSort());
