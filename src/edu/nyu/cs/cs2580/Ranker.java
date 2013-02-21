@@ -13,24 +13,33 @@ class Ranker {
   public Ranker(String index_source){
     _index = new Index(index_source);
   }
-
-	public Vector<ScoredDocument> runquery(String query, int rank) {
-		
+  public Vector<ScoredDocument> runquery1(String query) {
 		Vector<ScoredDocument> retrieval_results = new Vector<ScoredDocument>();
 		for (int i = 0; i < _index.numDocs(); ++i) {
-			if (rank == 0) {
 				retrieval_results.add(cosineSimilarity(query, i));
-			} else if (rank == 1) {
-				retrieval_results.add(phraseSimilarity(query, i));
-			} else if (rank == 2) {
-
-			} else if (rank == 3 ){
-				retrieval_results.add(numViews(query, i));
-			}
 		}
 		sortScoredDocuments(retrieval_results);
 		return retrieval_results;
 	}
+	public Vector<ScoredDocument> runquery2(String query) {
+		Vector<ScoredDocument> retrieval_results = new Vector<ScoredDocument>();
+		for (int i = 0; i < _index.numDocs(); ++i) {
+				retrieval_results.add(queryLikelihood(query, i));
+		}
+		sortScoredDocuments(retrieval_results);
+		return retrieval_results;
+	}
+	public Vector<ScoredDocument> runquery4(String query) {
+		Vector<ScoredDocument> retrieval_results = new Vector<ScoredDocument>();
+		for (int i = 0; i < _index.numDocs(); ++i) {
+				retrieval_results.add(numViews(query, i));
+		}
+		sortScoredDocuments(retrieval_results);
+		return retrieval_results;
+	}
+
+
+
 
 	public ScoredDocument cosineSimilarity(String query, int did) {
 
@@ -83,7 +92,7 @@ class Ranker {
 		return new ScoredDocument(did, d.get_title_string(), score);
 	}
 
-	public ScoredDocument phraseSimilarity(String query, int did) {
+	public ScoredDocument queryLikelihood(String query, int did) {
 
 		// Build query vector
 		Scanner s = new Scanner(query);
@@ -206,9 +215,9 @@ class Ranker {
 			System.out.format("%5d", qv_freq.get(z));
 		}
 		System.out.print("|");
-		
+
 	}
-	
+
 	public ScoredDocument numViews(String query, int did) {
 		Document d = _index.getDoc(did);
     	int numviews=d.get_numviews();
@@ -218,7 +227,7 @@ class Ranker {
 	private void sortScoredDocuments(Vector<ScoredDocument> retrieval_results) {
 		Collections.sort(retrieval_results,new ScoredDocumentSort());
 	}
-	
+
 	//sort ScoredDocuments in decreasing order
 	class ScoredDocumentSort implements Comparator<Object>{
 	    public int compare(Object obj1, Object obj2){
