@@ -1,5 +1,7 @@
 package edu.nyu.cs.cs2580;
 
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Vector;
 import java.util.Scanner;
 
@@ -47,4 +49,34 @@ class Ranker {
 
     return new ScoredDocument(did, d.get_title_string(), score);
   }
+  
+  public Vector < ScoredDocument > runquerywithnumviews(){
+	    Vector < ScoredDocument > retrieval_results = new Vector < ScoredDocument > ();
+	    for (int i = 0; i < _index.numDocs(); ++i){
+	    	Document d = _index.getDoc(i);
+	    	int numviews=d.get_numviews();
+	    	retrieval_results.add(new ScoredDocument(i, d.get_title_string(), numviews));
+	    }
+	    sortScoredDocuments(retrieval_results);
+	    return retrieval_results;
+  }
+
+	private void sortScoredDocuments(Vector<ScoredDocument> retrieval_results) {
+		Collections.sort(retrieval_results,new ScoredDocumentSort());
+	}
+}
+
+//sort ScoredDocuments in decreasing order
+class ScoredDocumentSort implements Comparator<Object>{
+    public int compare(Object obj1, Object obj2){
+    	ScoredDocument o1=(ScoredDocument) obj1;
+    	ScoredDocument o2=(ScoredDocument) obj2;
+        if(o1._score>o2._score){
+            return -1;
+        }
+        if(o1._score<o2._score){
+            return 1;
+        }
+        return 0;
+    }
 }
