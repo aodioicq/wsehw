@@ -1,5 +1,10 @@
 package edu.nyu.cs.cs2580;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -12,6 +17,23 @@ class Ranker {
 
   public Ranker(String index_source){
     _index = new Index(index_source);
+  }
+  public Vector<ScoredDocument> runquery(String query, int rankertype) throws Exception{
+	  switch (rankertype){
+	  	case 1:
+	  		return runquery1(query);
+	  	case 2:
+	  		return runquery2(query);
+	  	case 3:
+	  		return runquery3(query);
+	  	case 4:
+	  		return runquery4(query);
+	  	case 5:
+	  		return runquery5(query);
+	  	default:
+	  		throw new Exception("Invalid ranker signal");
+	  }
+		  
   }
   public Vector<ScoredDocument> runquery1(String query) {
 		Vector<ScoredDocument> retrieval_results = new Vector<ScoredDocument>();
@@ -53,8 +75,6 @@ class Ranker {
 		sortScoredDocuments(retrieval_results);
 		return retrieval_results;
 	}
-
-
 
 
 	public ScoredDocument cosineSimilarity(String query, int did) {
@@ -143,11 +163,11 @@ class Ranker {
 			} else {
 				dbXqv_freq.add(0.0);
 			}
-			System.out.print("Document Body frequency: " + dbXqv_freq.get(j));
+			//System.out.print("Document Body frequency: " + dbXqv_freq.get(j));
 			total_freq.add((double) d.termFrequency(qv.get(j)) / col_size);
-			System.out.print("  |  Collection frequency: "
-					+ d.termFrequency(qv.get(j)));
-			System.out.println("");
+			//System.out.print("  |  Collection frequency: "
+					// + d.termFrequency(qv.get(j)));
+			//System.out.println("");
 
 		}
 		for (int l = 0; l < dbXqv_freq.size(); l++) {
@@ -155,7 +175,7 @@ class Ranker {
 					* ((constant * dbXqv_freq.get(l)) + ((1 - constant) * total_freq
 							.get(0)));
 		}
-		System.out.println("The score is: " + score);
+		//System.out.println("The score is: " + score);
 
 		return new ScoredDocument(did, d.get_title_string(), score);
 	}
@@ -167,6 +187,7 @@ class Ranker {
 			String term = s.next();
 			qv.add(term);
 		}
+		s.close();
 		return qv;
 	}
 	
@@ -182,10 +203,10 @@ class Ranker {
 			cosDen1 += db_freq.get(i) * db_freq.get(i);
 			cosDen2 += qv_freq.get(i) * qv_freq.get(i);
 		}
-		System.out.println("");
-		System.out.println("");
+		//System.out.println("");
+		//System.out.println("");
 		score = cosNum / (Math.sqrt(cosDen1) * Math.sqrt(cosDen2));
-		System.out.println("The Cosine Similarity is: " + score);
+		//System.out.println("The Cosine Similarity is: " + score);
 		// /////////////////////////////////////////////////////////////////
 		return score;
 	}
@@ -215,22 +236,22 @@ class Ranker {
 			Vector<Integer> qv_freq) {
 
 		for (int z = 0; z < all.size(); z++) {
-			System.out.print("|");
-			System.out.format("%5s", all.get(z));
+			//System.out.print("|");
+			//System.out.format("%5s", all.get(z));
 		}
-		System.out.print("|");
-		System.out.println("");
+		//System.out.print("|");
+		//System.out.println("");
 		for (int z = 0; z < all.size(); z++) {
-			System.out.print("|");
-			System.out.format("%5d", db_freq.get(z));
+			//System.out.print("|");
+			//System.out.format("%5d", db_freq.get(z));
 		}
-		System.out.print("|");
-		System.out.println("");
+		//System.out.print("|");
+		//System.out.println("");
 		for (int z = 0; z < all.size(); z++) {
-			System.out.print("|");
-			System.out.format("%5d", qv_freq.get(z));
+			//System.out.print("|");
+			//System.out.format("%5d", qv_freq.get(z));
 		}
-		System.out.print("|");
+		//System.out.print("|");
 
 	}
 
@@ -263,12 +284,58 @@ class Ranker {
 		double ql=queryLikelihood(query, did)._score;
 		double phrase=phraseRanker(query, did)._score;
 		double numviews=numViews(query, did)._score;
-		double score=cosine+ql+phrase+numviews;
+		double score=0.5*cosine+0.45*ql+0.04995*phrase+0.000005*numviews;
 		return new ScoredDocument(did, d.get_title_string(), score);
 	}
 
 	private void sortScoredDocuments(Vector<ScoredDocument> retrieval_results) {
 		Collections.sort(retrieval_results,new ScoredDocumentSort());
+	}
+	
+	public void generateOutput(String queryfile) throws Exception{
+		Vector<String> queries = new Vector<String>();
+		try {
+	      BufferedReader reader = new BufferedReader(new FileReader(queryfile));
+	      try {
+	        String line = null;
+	        while ((line = reader.readLine()) != null){
+	          queries.add(line);
+	        }
+	      } finally {
+	        reader.close();
+	      }
+	    }catch (IOException ioe){
+	      System.err.println("Oops " + ioe.getMessage());
+	    }
+		System.out.println("Ranking and writing into file.....");
+		String file="";
+		for(int i=1;i<=5;++i){
+			switch(i){
+			case 1: file="results\\hw1.1-vsm.tsv";break;
+			case 2: file="results\\hw1.1-ql.tsv";break;
+			case 3: file="results\\hw1.1-phrase.tsv";break;
+			case 4: file="results\\hw1.1-numviews.tsv";break;
+			case 5: file="results\\hw1.2-linear.tsv";break;
+			}
+			for(String query:queries){
+				Vector<ScoredDocument> results=runquery(query, i);
+				try {
+				      BufferedWriter writer = new BufferedWriter(new FileWriter(file,true));
+				      try {
+				        for(ScoredDocument sd:results){
+				        	writer.write("<"+query+">\t"+sd._did+"\t"+sd._title+"\t"+sd._score);
+				        	writer.newLine();
+				        	writer.flush();
+				        }
+				      } finally {
+				        writer.close();
+				      }
+				    }catch (IOException ioe){
+				      System.err.println("Oops " + ioe.getMessage());
+				    }
+			}
+		}
+		System.out.println("Done writing into files. Check directory results for output files.");
 	}
 
 	//sort ScoredDocuments in decreasing order
