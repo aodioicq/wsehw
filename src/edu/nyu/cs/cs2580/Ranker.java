@@ -266,12 +266,21 @@ class Ranker {
 		Document d = _index.getDoc(did);
 		Vector<String> qv = queryVector(query);
 		Vector<String> db = d.get_body_vector();
-		for(int i=0;i<qv.size()-1;++i){
-			String bigram=qv.get(i)+" "+qv.get(i+1);
-			for(int j=0;j<db.size()-1;++j){
-				String docbigram=db.get(j)+" "+db.get(j+1);
-				if(bigram.equals(docbigram)){
+		if(qv.size()==1){
+			String q=qv.get(0);
+			for(int j=0;j<db.size();++j){
+				if(db.get(j).equals(q)){
 					matches++;
+				}
+			}
+		}else{
+			for(int i=0;i<qv.size()-1;++i){
+				String bigram=qv.get(i)+" "+qv.get(i+1);
+				for(int j=0;j<db.size()-1;++j){
+					String docbigram=db.get(j)+" "+db.get(j+1);
+					if(bigram.equals(docbigram)){
+						matches++;
+					}
 				}
 			}
 		}
