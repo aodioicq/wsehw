@@ -36,6 +36,7 @@ class Evaluator {
 				Vector<Double> reca = new Vector<Double>();
 				Vector<Double> f = new Vector<Double>();
 				Vector<Double> relavenceNDCG = new Vector<Double>();
+				Vector<Double> output = new Vector<Double>();
 				while ((line = reader.readLine()) != null) {
 					// parse the query,did,relevance line
 					Scanner s = new Scanner(line).useDelimiter("\t");
@@ -134,6 +135,12 @@ class Evaluator {
 
 	public static double evalF(Double precision, Double recall) {
 		return 1 / (.5 * (1 / precision) + (1 - .5) * (1 / recall));
+	}
+	public static double evalPreciAtRecall(Vector<Double> relavence)
+	{
+		double score = 0.0;
+		
+		return score;
 	}
 	public static double evalAvgPrecision(Vector<Double> relavence)
 	{
