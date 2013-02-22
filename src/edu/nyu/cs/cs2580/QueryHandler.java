@@ -32,6 +32,23 @@ class QueryHandler implements HttpHandler {
     return map;  
   } 
   
+  public String getResponseString(Vector<ScoredDocument> documents,String format,String query){
+	  String result="";
+	  if(format.equals("text")){
+		  for(ScoredDocument sd:documents){
+	        	result+=query+"\t"+sd._did+"\t"+sd._title+"\t"+sd._score+"\n";
+	        }
+	  }else{
+		  result+="<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" \"http://www.w3.org/TR/html4/loose.dtd\"><html><body>";
+		  for(ScoredDocument sd:documents){
+			  result+="Document id: "+sd._did+"\tTitle: "+sd._title+"\n<hr/>\n";
+		  }
+		  result+="</body></html>";
+		  
+	  }
+	  return result;
+  }
+  
   public void handle(HttpExchange exchange) throws IOException {
     String requestMethod = exchange.getRequestMethod();
     if (!requestMethod.equalsIgnoreCase("GET")){  // GET requests only.
@@ -45,10 +62,10 @@ class QueryHandler implements HttpHandler {
       System.out.print(key + ":" + requestHeaders.get(key) + "; ");
     }
     System.out.println();
-    String queryResponse = "";  
+    String queryResponse = "";
     String uriQuery = exchange.getRequestURI().getQuery();
     String uriPath = exchange.getRequestURI().getPath();
-
+    String format="text";
     if ((uriPath != null) && (uriQuery != null)){
       if (uriPath.equals("/search")){
         Map<String,String> query_map = getQueryMap(uriQuery);
@@ -56,18 +73,25 @@ class QueryHandler implements HttpHandler {
         if (keys.contains("query")){
           if (keys.contains("ranker")){
             String ranker_type = query_map.get("ranker");
+            String query = query_map.get("query");
+            format = query_map.get("format");
             // @CS2580: Invoke different ranking functions inside your
             // implementation of the Ranker class.
             if (ranker_type.equals("cosine")){
-              queryResponse = (ranker_type + " not implemented.");
+              //queryResponse = (ranker_type + " not implemented.");
+            	queryResponse = getResponseString(_ranker.runquery1(query),format,query);
             } else if (ranker_type.equals("QL")){
-              queryResponse = (ranker_type + " not implemented.");
+              //queryResponse = (ranker_type + " not implemented.");
+            	queryResponse = getResponseString(_ranker.runquery2(query),format,query);
             } else if (ranker_type.equals("phrase")){
-              queryResponse = (ranker_type + " not implemented.");
+              //queryResponse = (ranker_type + " not implemented.");
+            	queryResponse = getResponseString(_ranker.runquery3(query),format,query);
             } else if (ranker_type.equals("linear")){
-              queryResponse = (ranker_type + " not implemented.");
+              //queryResponse = (ranker_type + " not implemented.");
+            	queryResponse = getResponseString(_ranker.runquery5(query),format,query);
             } else {
-              queryResponse = (ranker_type+" not implemented.");
+              //queryResponse = (ranker_type+" not implemented.");
+            	queryResponse = getResponseString(_ranker.runquery1(query),format,query);
             }
           } else {
             // @CS2580: The following is instructor's simple ranker that does not
@@ -91,7 +115,11 @@ class QueryHandler implements HttpHandler {
     
       // Construct a simple response.
       Headers responseHeaders = exchange.getResponseHeaders();
-      responseHeaders.set("Content-Type", "text/plain");
+      if(format.equals("text")){
+    	  responseHeaders.set("Content-Type", "text/plain");
+      }else{
+    	  responseHeaders.set("Content-Type", "text/html");
+      }
       exchange.sendResponseHeaders(200, 0);  // arbitrary number of bytes
       OutputStream responseBody = exchange.getResponseBody();
       responseBody.write(queryResponse.getBytes());

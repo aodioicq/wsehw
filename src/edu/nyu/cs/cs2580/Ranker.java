@@ -316,7 +316,6 @@ class Ranker {
 	    }catch (IOException ioe){
 	      System.err.println("Oops " + ioe.getMessage());
 	    }
-		System.out.println("Ranking and writing into file.....");
 		String file="";
 		for(int i=1;i<=5;++i){
 			switch(i){
@@ -326,13 +325,14 @@ class Ranker {
 			case 4: file="results\\hw1.1-numviews.tsv";break;
 			case 5: file="results\\hw1.2-linear.tsv";break;
 			}
+			System.out.println("Ranking and writing into file "+file.substring(8));
 			for(String query:queries){
 				Vector<ScoredDocument> results=runquery(query, i);
 				try {
 				      BufferedWriter writer = new BufferedWriter(new FileWriter(file,true));
 				      try {
 				        for(ScoredDocument sd:results){
-				        	writer.write("<"+query+">\t"+sd._did+"\t"+sd._title+"\t"+sd._score);
+				        	writer.write(query+"\t"+sd._did+"\t"+sd._title+"\t"+sd._score);
 				        	writer.newLine();
 				        	writer.flush();
 				        }
