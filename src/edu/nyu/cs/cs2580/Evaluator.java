@@ -80,10 +80,23 @@ class Evaluator {
 					System.out.println("F-measure: " + f.get(i));
 
 				}
-				evalAvgPrecision(relavence);
-				evalNDCG(relavenceNDCG);
-				evalReciprocal(relavence);
 				
+				
+				
+				for (int j = 0;j<prec.size();j++){
+					output.add(prec.get(j));
+				}
+				for (int k = 0;k<prec.size();k++){
+					output.add(reca.get(k));
+				}
+				for (int l = 0;l<prec.size();l++){
+					output.add(prec.get(l));
+				}
+			// SPACE RESERVED FOR THE LAST EVAL METHOD
+			
+				output.add(evalAvgPrecision(relavence));
+				output.add(evalNDCG(relavenceNDCG));
+				output.add(evalReciprocal(relavence));
 				
 			} finally {
 				reader.close();
