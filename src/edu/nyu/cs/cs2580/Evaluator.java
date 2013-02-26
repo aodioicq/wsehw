@@ -21,10 +21,45 @@ class Evaluator {
 		String p = "/home/user/workspace/Homework1/src/qrels.tsv";// args[0];
 		eval("bing", p);
 		// first read the relevance judgments into the HashMap
-		// readRelevanceJudgments(p,relevance_judgments);
+		readRelevanceJudgments(p,relevance_judgments);
 		// now evaluate the results from stdin
 		// evaluateStdin(relevance_judgments);
 	}
+
+	 public static void readRelevanceJudgments(
+	    String p,HashMap < String , HashMap < Integer , Double > > relevance_judgments){
+	    try {
+	      BufferedReader reader = new BufferedReader(new FileReader(p));
+	      try {
+	        String line = null;
+	        while ((line = reader.readLine()) != null){
+	          // parse the query,did,relevance line
+	          Scanner s = new Scanner(line).useDelimiter("\t");
+	          String query = s.next();
+	          int did = Integer.parseInt(s.next());
+	          String grade = s.next();
+	          double rel = 0.0;
+	          // convert to binary relevance
+	          if ((grade.equals("Perfect")) ||
+	            (grade.equals("Excellent")) ||
+	            (grade.equals("Good"))){
+	            rel = 1.0;
+	          }
+	          if (relevance_judgments.containsKey(query) == false){
+	            HashMap < Integer , Double > qr = new HashMap < Integer , Double >();
+	            relevance_judgments.put(query,qr);
+	          }
+	          HashMap < Integer , Double > qr = relevance_judgments.get(query);
+	          qr.put(did,rel);
+	        }
+	      } finally {
+	        reader.close();
+	      }
+	    } catch (IOException ioe){
+	      System.err.println("Oops " + ioe.getMessage());
+	    }
+	  }
+
 
 	public static double eval(String user_query, String p) {
 		try {
