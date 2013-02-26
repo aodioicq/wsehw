@@ -1,5 +1,6 @@
 package edu.nyu.cs.cs2580;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.File;
 import java.io.FileReader;
@@ -19,71 +20,196 @@ class Evaluator {
 		// return;
 		// }
 		String p = "/home/user/workspace/Homework1/src/qrels.tsv";// args[0];
-		eval("bing", p);
+		eval("bing", p, 1);
 		// first read the relevance judgments into the HashMap
-		readRelevanceJudgments(p,relevance_judgments);
+		// readRelevanceJudgments(p,relevance_judgments);
 		// now evaluate the results from stdin
 		// evaluateStdin(relevance_judgments);
 	}
+	public static Vector<String[]> retrieveRank(int type)
+	{
+		Vector<String[]> rankData = new Vector<String[]>();
+		BufferedReader br = null;
+		String fileName = "";
+		switch (type){
+		case 1:	fileName = "results\\hw1.1-vsm.tsv";
+		break;
+		case 2: fileName = "results\\hw1.1-ql.tsv";
+		break;
+		case 4:	fileName = "results\\hw1.1-numviews.tsv";
+		break;
+		case 5: fileName = "results\\hw1.1-ql.tsv";
+		break;
+		case 3:	fileName = "results\\hw1.2-linear.tsv";
+		break;
+
+		}
+		String sCurrentLine;
+
+		try {
+			br = new BufferedReader(new FileReader(fileName));
+			while ((sCurrentLine = br.readLine()) != null) {
+				// | 0 | query | 0 | | 1 | sd._did | 1 | | 2 | sd._title | 2 | | 3 | sd._score | 3 |
+				rankData.add(sCurrentLine.split("\t"));
+				//System.out.println(sCurrentLine);
+			}
+			br.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		return rankData;
+
+	}
+	public static Vector<Double> docNDCG(Vector<String> relQuery,Vector<Integer>relDiD,Vector<String> relGrade,
+			Vector<String> docQuery,Vector<Integer> docDiD,String user_query)
+	{
+		Vector<Double> NDCG = new Vector<Double>();
+		int docIndex = 0;
+		int relIndex = 0;
+		String grade = null;
+		for(int i = 0;i<docQuery.size();i++)
+		{
+				docIndex = docDiD.get(i);
+				
+				if(relDiD.contains(docIndex))
+				{
+				relIndex = relDiD.indexOf(docIndex);
+				if(user_query.equals(relQuery.get(relIndex)))
+				{
+					grade = relGrade.get(relIndex); // gets the grade of the first doc id
+				}
+				else
+				{
+					grade = "Bad";
+				}}
+				else 
+				{
+					grade = "Bad";
+				}
+					switch(grade)
+					{
+					case "Perfect": NDCG.add(10.0); 
+					break;
+					case "Excellent": NDCG.add(7.0);
+					break;
+					case "Good": NDCG.add(5.0);
+					break;
+					case "Fair": NDCG.add(1.0);
+					break;
+					case "Bad": NDCG.add(0.0);
+					}
+				}
+		return NDCG;
+	}
+	public static Vector<Double> docRelavence(Vector<String> relQuery,Vector<Integer>relDiD,Vector<String> relGrade,
+			Vector<String> docQuery,Vector<Integer> docDiD,String user_query) // probably do not need user_query since the doc stuff is already ranked based on the query
+			{
+		Vector<Double> relavence = new Vector<Double>();
+		double rel = 0.0;
+		int docIndex = 0;
+		int relIndex = 0;
+		String grade = null;
+		for(int i = 0;i<docQuery.size();i++)
+		{
+		
+				docIndex = docDiD.get(i);
+				if(relDiD.contains(docIndex))
+				{
+				relIndex = relDiD.indexOf(docIndex);
+					if(user_query.equals(relQuery.get(relIndex)))
+					{
+						grade = relGrade.get(relIndex); // gets the grade of the first doc id
+					}
+					else
+					{
+						grade = "Bad";
+					}
+				}
+				else 
+				{
+					grade = "Bad";
+				}
 	
-	public static double eval(String user_query, String p) {
+				// convert to binary relevance
+				if ((grade.equals("Perfect"))
+						|| (grade.equals("Excellent"))
+						|| (grade.equals("Good"))) {
+					rel = 1.0;
+				}
+				else
+				{
+					rel = 0.0;
+				}
+			relavence.add(rel);
+			
+		}
+		
+		for(int j = 0;j<30;j++)
+			System.out.println(relavence.get(j));
+		return relavence;
+
+			}
+	public static double eval(String user_query, String p,int type) {
 		try {
 			BufferedReader reader = new BufferedReader(new FileReader(p));
 			try {
+
 				String line = null;
+				/*
+				 * See about cleaning up the number of vector variables so there aren't as many (if possible)
+				 */
+				// | 0 | query | 0 | | 1 | sd._did | 1 | | 2 | sd._title | 2 | | 3 | sd._score | 3 |
+				Vector<String[]> rankData = retrieveRank(type);
+
+				Vector<Integer> docDiD = new Vector<Integer>();
 				Vector<Double> relavence = new Vector<Double>();
+				Vector<String> docQuery = new Vector<String>();
 				Vector<Double> prec = new Vector<Double>();
 				Vector<Double> reca = new Vector<Double>();
 				Vector<Double> f = new Vector<Double>();
 				double[] precATreca = new double[11];
 				Vector<Double> relavenceNDCG = new Vector<Double>();
 				Vector<Double> output = new Vector<Double>();
+				Vector<String> relQuery = new Vector<String>();
+				Vector<Integer> relDiD = new Vector<Integer>();
+				Vector<String> relGrade = new Vector<String>();
+				for(int i = 0;i<rankData.size();i++)
+				{
+
+					docQuery.add(rankData.get(i)[0]);
+					docDiD.add(Integer.parseInt(rankData.get(i)[1]));
+				}
 				while ((line = reader.readLine()) != null) {
 					// parse the query,did,relevance line
 					Scanner s = new Scanner(line).useDelimiter("\t");
-					String query = s.next();
-					int did = Integer.parseInt(s.next());
-					String grade = s.next();
-
-					double rel = 0.0;
-					// convert to binary relevance
-					if ((grade.equals("Perfect"))
-							|| (grade.equals("Excellent"))
-							|| (grade.equals("Good"))) {
-						rel = 1.0;
-					}
-					if (query.equals(user_query)) {
-						relavence.add(rel);
-						switch(grade)
-						{
-						case "Perfect": relavenceNDCG.add(10.0); 
-						break;
-						case "Excellent": relavenceNDCG.add(7.0);
-						break;
-						case "Good": relavenceNDCG.add(5.0);
-						break;
-						case "Fair": relavenceNDCG.add(1.0);
-						break;
-						case "Bad": relavenceNDCG.add(0.0);
-						}
-					}
-
+					relQuery.add(s.next());
+					relDiD.add(Integer.parseInt(s.next()));
+					relGrade.add(s.next());	
+					s.close();
 				}
-
+				relavence = docRelavence(relQuery,relDiD,relGrade,docQuery,docDiD,user_query);
+				relavenceNDCG = docNDCG(relQuery,relDiD,relGrade,docQuery,docDiD,user_query);
+				// Precision
 				prec.add(evalPrecision(relavence, 1.0));
 				prec.add(evalPrecision(relavence, 5.0));
 				prec.add(evalPrecision(relavence, 10.0));
+				//
+				// Recall
 				reca.add(evalRecall(relavence, 1.0));
 				reca.add(evalRecall(relavence, 5.0));
 				reca.add(evalRecall(relavence, 10.0));
+				// 
+				// F-value
 				for (int i = 0; i < prec.size(); i++) {
 					f.add(evalF(prec.get(i), reca.get(i)));
 					System.out.println("F-measure: " + f.get(i));
 
 				}
+				//
 
-
-
+				// Add to output
 				for (int j = 0;j<prec.size();j++){
 					output.add(prec.get(j));
 				}
@@ -93,14 +219,22 @@ class Evaluator {
 				for (int l = 0;l<prec.size();l++){
 					output.add(prec.get(l));
 				}
+				// precision at recall value
 				precATreca = evalPreciAtRecall(prec,reca);
-				for (int m = 0;m<precATreca.length;m++)
-				{
+					for (int m = 0;m<precATreca.length;m++)
+					{
 					output.add(precATreca[m]);
-				}
-				output.add(evalAvgPrecision(relavence));
-				output.add(evalNDCG(relavenceNDCG));
-				output.add(evalReciprocal(relavence));
+					}
+				//
+				// Average Precision
+					output.add(evalAvgPrecision(relavence));
+				
+				// NDCG
+						output.add(evalNDCG(relavenceNDCG));
+				//
+				// Reciprocal
+						output.add(evalReciprocal(relavence));
+				//
 
 			} finally {
 				reader.close();
@@ -115,6 +249,7 @@ class Evaluator {
 		double score = 0.0;
 		// Checks for the case where there may be less documents than the
 		// precision k_value
+		
 		for (int i = relavence.size(); i <= k_value; i++) {
 			relavence.add(0.0);
 		}
@@ -137,6 +272,7 @@ class Evaluator {
 		for (int j = 0; j < relavence.size(); j++) {
 			totalRel += relavence.get(j);
 		}
+		System.out.println("Total relavence " + totalRel);
 		for (int k = 0; k < k_value; k++) {
 			score += relavence.get(k);
 		}
@@ -153,6 +289,11 @@ class Evaluator {
 	public static double evalF(Double precision, Double recall) {
 		return 1 / (.5 * (1 / precision) + (1 - .5) * (1 / recall));
 	}
+	/**
+	 * @param precision
+	 * @param recall
+	 * @return
+	 */
 	public static double[] evalPreciAtRecall(Vector<Double> precision,Vector<Double> recall)
 	{
 		double score = 0.0;
@@ -197,7 +338,7 @@ class Evaluator {
 
 			AP += (score / (i+1));
 
-			System.out.println("At " + (i+1) + " the score is " + score + " the Avg Preision is " + AP / score);
+		//	System.out.println("At " + (i+1) + " the score is " + score + " the Avg Preision is " + AP / score);
 		}
 		System.out.println("Evaluation for AVG Precision is " + AP / score);
 		return AP / score;
