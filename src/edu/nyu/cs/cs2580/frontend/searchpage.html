@@ -19,7 +19,7 @@ function submit_form(){
 	      break;
 	   }
 	}
-	var request="http://172.26.205.15:25813/search?query="+document.search.query.value+r+f;
+	var request="http://localhost:25813/search?query="+document.search.query.value+r+f;
 	var uri_request=encodeURI(request);
 	console.log(uri_request);
 	window.open(uri_request); 
