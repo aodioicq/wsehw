@@ -19,7 +19,7 @@ class Evaluator {
 		// System.out.println("need to provide relevance_judgments");
 		// return;
 		// }
-		String p = "/home/user/workspace/Homework1/src/qrels.tsv";// args[0];
+		String p = "data/qrels.tsv";// args[0];
 		eval("bing", p, 1);
 		// first read the relevance judgments into the HashMap
 		// readRelevanceJudgments(p,relevance_judgments);
@@ -240,7 +240,7 @@ class Evaluator {
 					output.add(prec.get(l));
 				}
 				// precision at recall value
-				precATreca = evalPreciAtRecall(prec,reca);
+				precATreca = evalPreciAtRecall(relavence ,prec,reca);
 					for (int m = 0;m<precATreca.length;m++)
 					{
 					output.add(precATreca[m]);
@@ -314,8 +314,45 @@ class Evaluator {
 	 * @param recall
 	 * @return
 	 */
-	public static double[] evalPreciAtRecall(Vector<Double> precision,Vector<Double> recall)
+	public static double[] evalPreciAtRecall(Vector<Double> rel, Vector<Double> precision,Vector<Double> recall)
 	{
+		
+		double[] precisions=new double[10];
+		double[] recalls=new double[10];
+		double[] precisionsAtRecall=new double[11];
+		for(int i=0;i<10;++i){
+			precisions[i]=evalPrecision(rel, i+1);
+			recalls[i]=evalRecall(rel, i+1);
+		}
+		int start=0;
+		for(int i=0;i<11;++i){
+			double maxPrecision=0.0;
+			boolean foundstart=false;
+			double index=(double)i/10;
+			for(int j=0;j<10;++j){
+				if(recalls[j]>=index){
+					start=j;
+					foundstart=true;
+					break;
+				}
+			}
+			if(!foundstart){
+				precisionsAtRecall[i]=0;
+				continue;
+			}
+			for(int j=start;j<10;++j){
+				if(precisions[j]>maxPrecision){
+					maxPrecision=precisions[j];
+				}
+			}
+			precisionsAtRecall[i]=maxPrecision;
+		}
+		for(int i=0;i<precisionsAtRecall.length;i++)
+		{
+			System.out.print(precisionsAtRecall[i] + " |");
+		}
+		return precisionsAtRecall;
+		/*
 		double score = 0.0;
 		double[] temp = new double[11];
 		int index = 0;
@@ -340,7 +377,7 @@ class Evaluator {
 		}
 		System.out.println("");
 		return temp;
-
+		*/
 
 	}
 	public static double evalAvgPrecision(Vector<Double> relavence)
