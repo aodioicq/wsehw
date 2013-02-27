@@ -71,6 +71,8 @@ class Evaluator {
 		String grade = null;
 		for(int i = 0;i<docQuery.size();i++)
 		{
+			if(user_query.equals(docQuery.get(i)))
+			{
 				docIndex = docDiD.get(i);
 				
 				if(relDiD.contains(docIndex))
@@ -101,6 +103,7 @@ class Evaluator {
 					case "Bad": NDCG.add(0.0);
 					}
 				}
+		}
 		return NDCG;
 	}
 	public static Vector<Double> docRelavence(Vector<String> relQuery,Vector<Integer>relDiD,Vector<String> relGrade,
@@ -111,13 +114,17 @@ class Evaluator {
 		int docIndex = 0;
 		int relIndex = 0;
 		String grade = null;
+		
 		for(int i = 0;i<docQuery.size();i++)
 		{
-		
+			if(user_query.equals(docQuery.get(i)))
+			{
 				docIndex = docDiD.get(i);
 				if(relDiD.contains(docIndex))
 				{
-				relIndex = relDiD.indexOf(docIndex);
+					
+						relIndex = relDiD.indexOf(docIndex);
+					
 					if(user_query.equals(relQuery.get(relIndex)))
 					{
 						grade = relGrade.get(relIndex); // gets the grade of the first doc id
@@ -143,11 +150,11 @@ class Evaluator {
 					rel = 0.0;
 				}
 			relavence.add(rel);
-			
+			}
 		}
 		
-		for(int j = 0;j<30;j++)
-			System.out.println(relavence.get(j));
+		//for(int j = 0;j<30;j++)
+			//System.out.println(relavence.get(j));
 		return relavence;
 
 			}
@@ -175,20 +182,33 @@ class Evaluator {
 				Vector<String> relQuery = new Vector<String>();
 				Vector<Integer> relDiD = new Vector<Integer>();
 				Vector<String> relGrade = new Vector<String>();
+				String q = null;
 				for(int i = 0;i<rankData.size();i++)
 				{
 
 					docQuery.add(rankData.get(i)[0]);
 					docDiD.add(Integer.parseInt(rankData.get(i)[1]));
 				}
+				//System.out.println("RANK DATA SIZE " + rankData.get(1047)[0]);
 				while ((line = reader.readLine()) != null) {
 					// parse the query,did,relevance line
 					Scanner s = new Scanner(line).useDelimiter("\t");
-					relQuery.add(s.next());
+					q = s.next();
+					if(q.equals(user_query))
+					{
+					relQuery.add(q);
 					relDiD.add(Integer.parseInt(s.next()));
-					relGrade.add(s.next());	
+					relGrade.add(s.next());
+					}
+					else
+					{
+						s.next();
+						s.next();
+					}
+						
 					s.close();
 				}
+				
 				relavence = docRelavence(relQuery,relDiD,relGrade,docQuery,docDiD,user_query);
 				relavenceNDCG = docNDCG(relQuery,relDiD,relGrade,docQuery,docDiD,user_query);
 				// Precision
@@ -272,7 +292,7 @@ class Evaluator {
 		for (int j = 0; j < relavence.size(); j++) {
 			totalRel += relavence.get(j);
 		}
-		System.out.println("Total relavence " + totalRel);
+
 		for (int k = 0; k < k_value; k++) {
 			score += relavence.get(k);
 		}
