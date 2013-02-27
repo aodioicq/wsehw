@@ -291,7 +291,9 @@ class Evaluator {
 				output.add(evalAvgPrecision(relavence));
 			
 			// NDCG
-					output.add(evalNDCG(relavenceNDCG));
+					output.add(evalNDCG(relavenceNDCG,1));
+					output.add(evalNDCG(relavenceNDCG,5));
+					output.add(evalNDCG(relavenceNDCG,10));
 			//
 			// Reciprocal
 					output.add(evalReciprocal(relavence));
@@ -410,25 +412,25 @@ class Evaluator {
 		//System.out.println("Evaluation for AVG Precision is " + AP / score);
 		return AP / score;
 	}
-	public static double evalNDCG(Vector<Double> relavence)
+	public static double evalNDCG(Vector<Double> relavence,int k_value)
 	{
 		double DCG = 0.0;
 		double sortedDCG = 0.0;
 		double NDCG = 0.0;
-		DCG = evalDCG(relavence);
+		DCG = evalDCG(relavence,k_value);
 		Collections.sort(relavence);
 		Collections.reverse(relavence);
-		sortedDCG = evalSortedDCG(relavence);
+		sortedDCG = evalSortedDCG(relavence,k_value);
 		NDCG = DCG/sortedDCG;
 		//System.out.println("NDCG is " + NDCG);
 
 		return NDCG;
 	}
-	public static double evalDCG(Vector<Double> relavence)
+	public static double evalDCG(Vector<Double> relavence,int k_value)
 	{
 		double DCG = 0.0;
 		double gain = 0.0;
-		for (int i = 0;i<relavence.size();i++)
+		for (int i = 0;i<k_value;i++)
 		{
 			gain = relavence.get(i);
 			DCG += gain / (Math.log(i+2)/Math.log(2));
@@ -437,11 +439,11 @@ class Evaluator {
 
 		return DCG;
 	}
-	public static double evalSortedDCG(Vector<Double> relavence)
+	public static double evalSortedDCG(Vector<Double> relavence,int k_value)
 	{
 		double DCG = 0.0;
 		double gain = 0.0;
-		for (int i = 0;i<relavence.size();i++)
+		for (int i = 0;i<k_value;i++)
 		{
 			gain = relavence.get(i);
 			DCG += gain / (Math.log(i+2)/Math.log(2));
