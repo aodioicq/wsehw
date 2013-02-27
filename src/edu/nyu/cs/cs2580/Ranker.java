@@ -92,8 +92,8 @@ class Ranker {
 
 		// Stores all text in the document body and maps the frequency to it
 		Vector<String> all = new Vector<String>();
-		Vector<Integer> db_freq = new Vector<Integer>();
-		Vector<Integer> qv_freq = new Vector<Integer>();
+		Vector<Double> db_freq = new Vector<Double>();
+		Vector<Double> qv_freq = new Vector<Double>();
 		double score;
 		String key = "";
 		int index = 0;
@@ -104,20 +104,91 @@ class Ranker {
 		all = populateAll(qv, all);
 		db_freq = initializeVector(all.size());
 		qv_freq = initializeVector(all.size());
-
+ 
+		
 		// Increments the frequency vectors where there are matches ////////
-		for (int k = 0; k < db.size(); k++) {
-			index = all.indexOf(db.get(k));
-			db_freq.set(index, db_freq.get(index) + 1);
-		}
+				for (int k = 0; k < db.size(); k++) {
+					index = all.indexOf(db.get(k));
+					db_freq.set(index, db_freq.get(index) + 1);
+				}
 
-		for (int l = 0; l < qv.size(); l++) {
-			index = all.indexOf(qv.get(l));
-			qv_freq.set(index, qv_freq.get(index) + 1);
+				for (int l = 0; l < qv.size(); l++) {
+					index = all.indexOf(qv.get(l));
+					qv_freq.set(index, qv_freq.get(index) + 1);
+				}
+				
+		double sumforthisword=0.0;
+		double sumforthisword1=0.0;
+		double index1=0.0;
+		
+		double qsumforthisword=0.0;
+		double qsumforthisword1=0.0;
+		double qindex1=0.0;
+		int qindex=0;
+		// NORMALIZE DB
+		
+		
+		for (int kk = 0; kk < qv.size(); kk++) {
+			index = all.indexOf(db.get(kk));
+			
+			sumforthisword1 += 
+			(((Math.log(db_freq.get(index))+1.0)/Math.log(2))*
+			(Math.log(d.termFrequency()/db_freq.get(index))/Math.log(2)))*
+			(((Math.log(db_freq.get(index))+1.0)/Math.log(2))*
+					(Math.log(d.termFrequency()/db_freq.get(index))/Math.log(2)));
+			
+		
 		}
-		// /////////////////////////////////////////////////////////////////
-		printCosine(all, db_freq, qv_freq);
+		sumforthisword1 = Math.sqrt(sumforthisword1);
+		
+		
+		for (int di = 0; di < qv.size(); di++) {
+			index = all.indexOf(db.get(di));
+			sumforthisword = 
+					((Math.log(db_freq.get(index))+1.0)/Math.log(2))*
+					(Math.log(d.termFrequency()/db_freq.get(index))/Math.log(2));
 
+		db_freq.set(index, sumforthisword/sumforthisword1);	
+		}
+		
+		
+		//System.out.println("d " + sumforthisword/sumforthisword1);
+	
+		 /////////////////////////
+		// NORMALIZE QV
+		
+
+	
+		
+		for (int kk = 0; kk < qv.size(); kk++) {
+			qindex = all.indexOf(qv.get(kk));
+			qsumforthisword1 += 
+			(((Math.log(qv_freq.get(qindex))+1.0)/Math.log(2))*
+			(Math.log(d.termFrequency()/qv_freq.get(qindex))/Math.log(2)))*
+			(((Math.log(qv_freq.get(qindex))+1.0)/Math.log(2))*
+			(Math.log(d.termFrequency()/qv_freq.get(qindex))/Math.log(2)));
+			
+			
+		
+		}
+		qsumforthisword1 = Math.sqrt(qsumforthisword1);
+		
+		
+		for (int di = 0; di < qv.size(); di++) {
+			qindex = all.indexOf(qv.get(di));
+			qsumforthisword = 
+					((Math.log(qv_freq.get(qindex))+1.0)/Math.log(2))*
+					(Math.log(d.termFrequency()/qv_freq.get(qindex))/Math.log(2));
+
+		qv_freq.set(qindex, qsumforthisword/qsumforthisword1);	
+		}
+		
+	
+		//System.out.println("q " + qsumforthisword/qsumforthisword1);
+		
+		////////
+		
+		//printCosine(all,db_freq,qv_freq);
 		score = calculateCosine(db_freq, qv_freq);
 
 		return new ScoredDocument(did, d.get_title_string(), score);
@@ -141,7 +212,7 @@ class Ranker {
 		int col_size = d.termFrequency();
 		Vector<Double> total_freq = new Vector<Double>();
 		Vector<Double> dbXqv_freq = new Vector<Double>();
-		Vector<Integer> db_freq = new Vector<Integer>();
+		Vector<Double> db_freq = new Vector<Double>();
 
 		Vector<String> all = new Vector<String>();
 		String key = "";
@@ -191,14 +262,16 @@ class Ranker {
 		return qv;
 	}
 	
-	private double calculateCosine(Vector<Integer> db_freq,
-			Vector<Integer> qv_freq) {
+	private double calculateCosine(Vector<Double> db_freq,
+			Vector<Double> qv_freq) {
 		// Calculates the cosine similarity ////////////////////////////////
 		double cosNum = 0.0;
 		double cosDen1 = 0.0;
 		double cosDen2 = 0.0;
 		double score = 0.0;
+
 		for (int i = 0; i < db_freq.size(); i++) {
+		//	System.out.println(db_freq.get(i));
 			cosNum += db_freq.get(i) * qv_freq.get(i);
 			cosDen1 += db_freq.get(i) * db_freq.get(i);
 			cosDen2 += qv_freq.get(i) * qv_freq.get(i);
@@ -211,10 +284,10 @@ class Ranker {
 		return score;
 	}
 
-	private Vector<Integer> initializeVector(int size) {
-		Vector<Integer> db_freq = new Vector<Integer>();
+	private Vector<Double> initializeVector(int size) {
+		Vector<Double> db_freq = new Vector<Double>();
 		for (int z = 0; z < size; z++) {
-			db_freq.add(0);
+			db_freq.add(0.0);
 		}
 		return db_freq;
 
@@ -232,26 +305,26 @@ class Ranker {
 		return all;
 	}
 
-	private void printCosine(Vector<String> all, Vector<Integer> db_freq,
-			Vector<Integer> qv_freq) {
+	private void printCosine(Vector<String> all, Vector<Double> db_freq,
+			Vector<Double> qv_freq) {
 
 		for (int z = 0; z < all.size(); z++) {
-			//System.out.print("|");
-			//System.out.format("%5s", all.get(z));
+			System.out.print("|");
+			System.out.format("%5s", all.get(z));
 		}
-		//System.out.print("|");
-		//System.out.println("");
+		System.out.print("|");
+		System.out.println("");
 		for (int z = 0; z < all.size(); z++) {
-			//System.out.print("|");
-			//System.out.format("%5d", db_freq.get(z));
+			System.out.print("|");
+			System.out.format("%5f", db_freq.get(z));
 		}
-		//System.out.print("|");
-		//System.out.println("");
+		System.out.print("|");
+		System.out.println("");
 		for (int z = 0; z < all.size(); z++) {
-			//System.out.print("|");
-			//System.out.format("%5d", qv_freq.get(z));
+			System.out.print("|");
+			System.out.format("%5f", qv_freq.get(z));
 		}
-		//System.out.print("|");
+		System.out.print("|");
 
 	}
 
@@ -352,9 +425,13 @@ class Ranker {
 	    public int compare(Object obj1, Object obj2){
 	    	ScoredDocument o1=(ScoredDocument) obj1;
 	    	ScoredDocument o2=(ScoredDocument) obj2;
-	    	Double s1=new Double(o1._score);
-	    	Double s2=new Double(o2._score);
-	    	return s2.compareTo(s1);
+	        if(o1._score>o2._score){
+	            return -1;
+	        }
+	        if(o1._score<o2._score){
+	            return 1;
+	        }
+	        return 0;
 	    }
 	}
 }
