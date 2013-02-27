@@ -102,6 +102,7 @@ class Ranker {
 		// need to do this for qv and db
 		all = populateAll(db, all);
 		all = populateAll(qv, all);
+		all = populateAll(dv, all);
 		db_freq = initializeVector(all.size());
 		qv_freq = initializeVector(all.size());
 
