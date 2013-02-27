@@ -13,32 +13,32 @@ import java.util.Scanner;
 
 class Ranker {
 
-  private Index _index;
+	private Index _index;
 
-  public Ranker(String index_source){
-    _index = new Index(index_source);
-  }
-  public Vector<ScoredDocument> runquery(String query, int rankertype) throws Exception{
-	  switch (rankertype){
-	  	case 1:
-	  		return runquery1(query);
-	  	case 2:
-	  		return runquery2(query);
-	  	case 3:
-	  		return runquery3(query);
-	  	case 4:
-	  		return runquery4(query);
-	  	case 5:
-	  		return runquery5(query);
-	  	default:
-	  		throw new Exception("Invalid ranker signal");
-	  }
-		  
-  }
-  public Vector<ScoredDocument> runquery1(String query) {
+	public Ranker(String index_source){
+		_index = new Index(index_source);
+	}
+	public Vector<ScoredDocument> runquery(String query, int rankertype) throws Exception{
+		switch (rankertype){
+		case 1:
+			return runquery1(query);
+		case 2:
+			return runquery2(query);
+		case 3:
+			return runquery3(query);
+		case 4:
+			return runquery4(query);
+		case 5:
+			return runquery5(query);
+		default:
+			throw new Exception("Invalid ranker signal");
+		}
+
+	}
+	public Vector<ScoredDocument> runquery1(String query) {
 		Vector<ScoredDocument> retrieval_results = new Vector<ScoredDocument>();
 		for (int i = 0; i < _index.numDocs(); ++i) {
-				retrieval_results.add(cosineSimilarity(query, i));
+			retrieval_results.add(cosineSimilarity(query, i));
 		}
 		sortScoredDocuments(retrieval_results);
 		return retrieval_results;
@@ -46,7 +46,7 @@ class Ranker {
 	public Vector<ScoredDocument> runquery2(String query) {
 		Vector<ScoredDocument> retrieval_results = new Vector<ScoredDocument>();
 		for (int i = 0; i < _index.numDocs(); ++i) {
-				retrieval_results.add(queryLikelihood(query, i));
+			retrieval_results.add(queryLikelihood(query, i));
 		}
 		sortScoredDocuments(retrieval_results);
 		return retrieval_results;
@@ -54,7 +54,7 @@ class Ranker {
 	public Vector<ScoredDocument> runquery3(String query) {
 		Vector<ScoredDocument> retrieval_results = new Vector<ScoredDocument>();
 		for (int i = 0; i < _index.numDocs(); ++i) {
-				retrieval_results.add(phraseRanker(query, i));
+			retrieval_results.add(phraseRanker(query, i));
 		}
 		sortScoredDocuments(retrieval_results);
 		return retrieval_results;
@@ -62,7 +62,7 @@ class Ranker {
 	public Vector<ScoredDocument> runquery4(String query) {
 		Vector<ScoredDocument> retrieval_results = new Vector<ScoredDocument>();
 		for (int i = 0; i < _index.numDocs(); ++i) {
-				retrieval_results.add(numViews(query, i));
+			retrieval_results.add(numViews(query, i));
 		}
 		sortScoredDocuments(retrieval_results);
 		return retrieval_results;
@@ -70,7 +70,7 @@ class Ranker {
 	public Vector<ScoredDocument> runquery5(String query) {
 		Vector<ScoredDocument> retrieval_results = new Vector<ScoredDocument>();
 		for (int i = 0; i < _index.numDocs(); ++i) {
-				retrieval_results.add(simpleLinearModel(query, i));
+			retrieval_results.add(simpleLinearModel(query, i));
 		}
 		sortScoredDocuments(retrieval_results);
 		return retrieval_results;
@@ -104,90 +104,78 @@ class Ranker {
 		all = populateAll(qv, all);
 		db_freq = initializeVector(all.size());
 		qv_freq = initializeVector(all.size());
- 
-		
-		// Increments the frequency vectors where there are matches ////////
-				for (int k = 0; k < db.size(); k++) {
-					index = all.indexOf(db.get(k));
-					db_freq.set(index, db_freq.get(index) + 1);
-				}
 
-				for (int l = 0; l < qv.size(); l++) {
-					index = all.indexOf(qv.get(l));
-					qv_freq.set(index, qv_freq.get(index) + 1);
-				}
-				
+
+		// Increments the frequency vectors where there are matches ////////
+		for (int k = 0; k < db.size(); k++) {
+			index = all.indexOf(db.get(k));
+			db_freq.set(index, db_freq.get(index) + 1);
+		}
+
+		for (int l = 0; l < qv.size(); l++) {
+			index = all.indexOf(qv.get(l));
+			qv_freq.set(index, qv_freq.get(index) + 1);
+		}
+
 		double sumforthisword=0.0;
 		double sumforthisword1=0.0;
 		double index1=0.0;
-		
+
 		double qsumforthisword=0.0;
 		double qsumforthisword1=0.0;
-		double qindex1=0.0;
+		double qindex1=0.0;	
 		int qindex=0;
 		// NORMALIZE DB
-		
-		
+
+
 		for (int kk = 0; kk < qv.size(); kk++) {
 			index = all.indexOf(db.get(kk));
-			
+
 			sumforthisword1 += 
-			(((Math.log(db_freq.get(index))+1.0)/Math.log(2))*
-			(Math.log(d.termFrequency()/db_freq.get(index))/Math.log(2)))*
-			(((Math.log(db_freq.get(index))+1.0)/Math.log(2))*
-					(Math.log(d.termFrequency()/db_freq.get(index))/Math.log(2)));
-			
-		
+					(((Math.log(db_freq.get(index))+1.0)/Math.log(2))*
+							(Math.log(d.termFrequency()/db_freq.get(index))/Math.log(2)))*
+							(((Math.log(db_freq.get(index))+1.0)/Math.log(2))*
+									(Math.log(d.termFrequency()/db_freq.get(index))/Math.log(2)));
+
+
 		}
 		sumforthisword1 = Math.sqrt(sumforthisword1);
-		
-		
+
+
 		for (int di = 0; di < qv.size(); di++) {
 			index = all.indexOf(db.get(di));
 			sumforthisword = 
 					((Math.log(db_freq.get(index))+1.0)/Math.log(2))*
 					(Math.log(d.termFrequency()/db_freq.get(index))/Math.log(2));
 
-		db_freq.set(index, sumforthisword/sumforthisword1);	
+			db_freq.set(index, sumforthisword/sumforthisword1);	
 		}
-		
-		
-		//System.out.println("d " + sumforthisword/sumforthisword1);
-	
-		 /////////////////////////
-		// NORMALIZE QV
-		
 
-	
-		
+		/////////////////////////
+		// NORMALIZE QV
+
 		for (int kk = 0; kk < qv.size(); kk++) {
 			qindex = all.indexOf(qv.get(kk));
 			qsumforthisword1 += 
-			(((Math.log(qv_freq.get(qindex))+1.0)/Math.log(2))*
-			(Math.log(d.termFrequency()/qv_freq.get(qindex))/Math.log(2)))*
-			(((Math.log(qv_freq.get(qindex))+1.0)/Math.log(2))*
-			(Math.log(d.termFrequency()/qv_freq.get(qindex))/Math.log(2)));
-			
-			
-		
+					(((Math.log(qv_freq.get(qindex))+1.0)/Math.log(2))*
+							(Math.log(d.termFrequency()/qv_freq.get(qindex))/Math.log(2)))*
+							(((Math.log(qv_freq.get(qindex))+1.0)/Math.log(2))*
+									(Math.log(d.termFrequency()/qv_freq.get(qindex))/Math.log(2)));
+
 		}
 		qsumforthisword1 = Math.sqrt(qsumforthisword1);
-		
-		
+
 		for (int di = 0; di < qv.size(); di++) {
 			qindex = all.indexOf(qv.get(di));
 			qsumforthisword = 
 					((Math.log(qv_freq.get(qindex))+1.0)/Math.log(2))*
 					(Math.log(d.termFrequency()/qv_freq.get(qindex))/Math.log(2));
 
-		qv_freq.set(qindex, qsumforthisword/qsumforthisword1);	
+			qv_freq.set(qindex, qsumforthisword/qsumforthisword1);	
 		}
-		
-	
-		//System.out.println("q " + qsumforthisword/qsumforthisword1);
-		
+
 		////////
-		
+
 		//printCosine(all,db_freq,qv_freq);
 		score = calculateCosine(db_freq, qv_freq);
 
@@ -237,7 +225,7 @@ class Ranker {
 			//System.out.print("Document Body frequency: " + dbXqv_freq.get(j));
 			total_freq.add((double) d.termFrequency(qv.get(j)) / col_size);
 			//System.out.print("  |  Collection frequency: "
-					// + d.termFrequency(qv.get(j)));
+			// + d.termFrequency(qv.get(j)));
 			//System.out.println("");
 
 		}
@@ -261,7 +249,7 @@ class Ranker {
 		s.close();
 		return qv;
 	}
-	
+
 	private double calculateCosine(Vector<Double> db_freq,
 			Vector<Double> qv_freq) {
 		// Calculates the cosine similarity ////////////////////////////////
@@ -271,7 +259,7 @@ class Ranker {
 		double score = 0.0;
 
 		for (int i = 0; i < db_freq.size(); i++) {
-		//	System.out.println(db_freq.get(i));
+			//	System.out.println(db_freq.get(i));
 			cosNum += db_freq.get(i) * qv_freq.get(i);
 			cosDen1 += db_freq.get(i) * db_freq.get(i);
 			cosDen2 += qv_freq.get(i) * qv_freq.get(i);
@@ -330,10 +318,10 @@ class Ranker {
 
 	public ScoredDocument numViews(String query, int did) {
 		Document d = _index.getDoc(did);
-    	int numviews=d.get_numviews();
-    	return new ScoredDocument(did, d.get_title_string(), numviews);
+		int numviews=d.get_numviews();
+		return new ScoredDocument(did, d.get_title_string(), numviews);
 	}
-	
+
 	public ScoredDocument phraseRanker(String query, int did){
 		int matches=0;
 		Document d = _index.getDoc(did);
@@ -359,7 +347,7 @@ class Ranker {
 		}
 		return new ScoredDocument(did, d.get_title_string(), matches);
 	}
-	
+
 	public ScoredDocument simpleLinearModel(String query, int did){
 		Document d = _index.getDoc(did);
 		double cosine=cosineSimilarity(query, did)._score;
@@ -373,22 +361,22 @@ class Ranker {
 	private void sortScoredDocuments(Vector<ScoredDocument> retrieval_results) {
 		Collections.sort(retrieval_results,new ScoredDocumentSort());
 	}
-	
+
 	public void generateOutput(String queryfile) throws Exception{
 		Vector<String> queries = new Vector<String>();
 		try {
-	      BufferedReader reader = new BufferedReader(new FileReader(queryfile));
-	      try {
-	        String line = null;
-	        while ((line = reader.readLine()) != null){
-	          queries.add(line);
-	        }
-	      } finally {
-	        reader.close();
-	      }
-	    }catch (IOException ioe){
-	      System.err.println("Oops " + ioe.getMessage());
-	    }
+			BufferedReader reader = new BufferedReader(new FileReader(queryfile));
+			try {
+				String line = null;
+				while ((line = reader.readLine()) != null){
+					queries.add(line);
+				}
+			} finally {
+				reader.close();
+			}
+		}catch (IOException ioe){
+			System.err.println("Oops " + ioe.getMessage());
+		}
 		String file="";
 		for(int i=1;i<=5;++i){
 			switch(i){
@@ -402,19 +390,19 @@ class Ranker {
 			for(String query:queries){
 				Vector<ScoredDocument> results=runquery(query, i);
 				try {
-				      BufferedWriter writer = new BufferedWriter(new FileWriter(file,true));
-				      try {
-				        for(ScoredDocument sd:results){
-				        	writer.write(query+"\t"+sd._did+"\t"+sd._title+"\t"+sd._score);
-				        	writer.newLine();
-				        	writer.flush();
-				        }
-				      } finally {
-				        writer.close();
-				      }
-				    }catch (IOException ioe){
-				      System.err.println("Oops " + ioe.getMessage());
-				    }
+					BufferedWriter writer = new BufferedWriter(new FileWriter(file,true));
+					try {
+						for(ScoredDocument sd:results){
+							writer.write(query+"\t"+sd._did+"\t"+sd._title+"\t"+sd._score);
+							writer.newLine();
+							writer.flush();
+						}
+					} finally {
+						writer.close();
+					}
+				}catch (IOException ioe){
+					System.err.println("Oops " + ioe.getMessage());
+				}
 			}
 		}
 		System.out.println("Done writing into files. Check directory results for output files.");
@@ -422,16 +410,16 @@ class Ranker {
 
 	//sort ScoredDocuments in decreasing order
 	class ScoredDocumentSort implements Comparator<Object>{
-	    public int compare(Object obj1, Object obj2){
-	    	ScoredDocument o1=(ScoredDocument) obj1;
-	    	ScoredDocument o2=(ScoredDocument) obj2;
-	        if(o1._score>o2._score){
-	            return -1;
-	        }
-	        if(o1._score<o2._score){
-	            return 1;
-	        }
-	        return 0;
-	    }
+		public int compare(Object obj1, Object obj2){
+			ScoredDocument o1=(ScoredDocument) obj1;
+			ScoredDocument o2=(ScoredDocument) obj2;
+			if(o1._score>o2._score){
+				return -1;
+			}
+			if(o1._score<o2._score){
+				return 1;
+			}
+			return 0;
+		}
 	}
 }
