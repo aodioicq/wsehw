@@ -10,37 +10,61 @@ import java.util.Collections;
 import java.util.Vector;
 import java.util.HashMap;
 import java.util.Scanner;
+import java.util.Iterator;
+
 
 class Evaluator {
 
 	public static void main(String[] args) throws IOException {
-		HashMap<String, HashMap<Integer, Double>> relevance_judgments = new HashMap<String, HashMap<Integer, Double>>();
-		// if (args.length < 1){
-		// System.out.println("need to provide relevance_judgments");
-		// return;
-		// }
-		String p = "data/qrels.tsv";// args[0];
-		eval("bing", p, 1);
-		// first read the relevance judgments into the HashMap
-		// readRelevanceJudgments(p,relevance_judgments);
+		//HashMap<String, HashMap<Integer, Double>> relevance_judgments = new HashMap<String, HashMap<Integer, Double>>();
+		Vector<String> relevance_judgments=new  Vector<String>();
+		/* if (args.length < 1){
+			 System.out.println("need to provide relevance_judgments");
+			 return;
+		 }*/
+		//String p = args[0];
+
+		 //first read the relevance judgments into the HashMap
+		 readRelevanceJudgments("data/qrels.tsv",relevance_judgments);
+		 //eval("bing", relevance_judgments, 1);
 		// now evaluate the results from stdin
-		// evaluateStdin(relevance_judgments);
+		 evaluateStdin(relevance_judgments,1);
 	}
 	public static Vector<String[]> retrieveRank(int type)
 	{
 		Vector<String[]> rankData = new Vector<String[]>();
+		if(type<0){
+			try {
+				BufferedReader reader = new BufferedReader(new InputStreamReader(
+						System.in));
+
+				String line = null;
+				while ((line = reader.readLine()) != null) {
+					Scanner s = new Scanner(line).useDelimiter("\t");
+					String query = s.next();
+					String did = s.next();
+					String title = s.next();
+					String rel = s.next();
+					String[] entry={query,did,title,rel};
+					rankData.add(entry);
+				}
+			} catch (Exception e) {
+				System.err.println("Error:" + e.getMessage());
+			}
+			return rankData;
+		}
 		BufferedReader br = null;
 		String fileName = "";
 		switch (type){
-		case 1:	fileName = "results\\hw1.1-vsm.tsv";
+		case 1:	fileName = "results/hw1.1-vsm.tsv";
 		break;
-		case 2: fileName = "results\\hw1.1-ql.tsv";
+		case 2: fileName = "results/hw1.1-ql.tsv";
 		break;
-		case 4:	fileName = "results\\hw1.1-numviews.tsv";
+		case 3:	fileName = "results/hw1.1-phrase.tsv";
 		break;
-		case 5: fileName = "results\\hw1.1-ql.tsv";
+		case 4: fileName = "results/hw1.1-numviews.tsv";
 		break;
-		case 3:	fileName = "results\\hw1.2-linear.tsv";
+		case 5:	fileName = "results/hw1.2-linear.tsv";
 		break;
 
 		}
@@ -158,111 +182,123 @@ class Evaluator {
 		return relavence;
 
 			}
-	public static double eval(String user_query, String p,int type) {
+	public static void readRelevanceJudgments(String p, Vector<String> relevance_judgments) {
 		try {
 			BufferedReader reader = new BufferedReader(new FileReader(p));
 			try {
-
 				String line = null;
-				/*
-				 * See about cleaning up the number of vector variables so there aren't as many (if possible)
-				 */
-				// | 0 | query | 0 | | 1 | sd._did | 1 | | 2 | sd._title | 2 | | 3 | sd._score | 3 |
-				Vector<String[]> rankData = retrieveRank(type);
-
-				Vector<Integer> docDiD = new Vector<Integer>();
-				Vector<Double> relavence = new Vector<Double>();
-				Vector<String> docQuery = new Vector<String>();
-				Vector<Double> prec = new Vector<Double>();
-				Vector<Double> reca = new Vector<Double>();
-				Vector<Double> f = new Vector<Double>();
-				double[] precATreca = new double[11];
-				Vector<Double> relavenceNDCG = new Vector<Double>();
-				Vector<Double> output = new Vector<Double>();
-				Vector<String> relQuery = new Vector<String>();
-				Vector<Integer> relDiD = new Vector<Integer>();
-				Vector<String> relGrade = new Vector<String>();
-				String q = null;
-				for(int i = 0;i<rankData.size();i++)
-				{
-
-					docQuery.add(rankData.get(i)[0]);
-					docDiD.add(Integer.parseInt(rankData.get(i)[1]));
-				}
-				//System.out.println("RANK DATA SIZE " + rankData.get(1047)[0]);
 				while ((line = reader.readLine()) != null) {
 					// parse the query,did,relevance line
 					Scanner s = new Scanner(line).useDelimiter("\t");
-					q = s.next();
-					if(q.equals(user_query))
-					{
-					relQuery.add(q);
-					relDiD.add(Integer.parseInt(s.next()));
-					relGrade.add(s.next());
-					}
-					else
-					{
-						s.next();
-						s.next();
-					}
-						
-					s.close();
+					String query = s.next();
+					String did = s.next();
+					String grade = s.next();
+					relevance_judgments.add(query);
+					relevance_judgments.add(did);
+					relevance_judgments.add(grade);
 				}
-				
-				relavence = docRelavence(relQuery,relDiD,relGrade,docQuery,docDiD,user_query);
-				relavenceNDCG = docNDCG(relQuery,relDiD,relGrade,docQuery,docDiD,user_query);
-				// Precision
-				prec.add(evalPrecision(relavence, 1.0));
-				prec.add(evalPrecision(relavence, 5.0));
-				prec.add(evalPrecision(relavence, 10.0));
-				//
-				// Recall
-				reca.add(evalRecall(relavence, 1.0));
-				reca.add(evalRecall(relavence, 5.0));
-				reca.add(evalRecall(relavence, 10.0));
-				// 
-				// F-value
-				for (int i = 0; i < prec.size(); i++) {
-					f.add(evalF(prec.get(i), reca.get(i)));
-					System.out.println("F-measure: " + f.get(i));
-
-				}
-				//
-
-				// Add to output
-				for (int j = 0;j<prec.size();j++){
-					output.add(prec.get(j));
-				}
-				for (int k = 0;k<prec.size();k++){
-					output.add(reca.get(k));
-				}
-				for (int l = 0;l<prec.size();l++){
-					output.add(prec.get(l));
-				}
-				// precision at recall value
-				precATreca = evalPreciAtRecall(relavence ,prec,reca);
-					for (int m = 0;m<precATreca.length;m++)
-					{
-					output.add(precATreca[m]);
-					}
-				//
-				// Average Precision
-					output.add(evalAvgPrecision(relavence));
-				
-				// NDCG
-						output.add(evalNDCG(relavenceNDCG));
-				//
-				// Reciprocal
-						output.add(evalReciprocal(relavence));
-				//
-
 			} finally {
 				reader.close();
 			}
 		} catch (IOException ioe) {
-			System.err.println("Oops " + ioe.getMessage());
+			//System.err.println("Oops " + ioe.getMessage());
 		}
-		return 0;
+	}
+	public static Vector<Double> eval(String user_query,  Vector<String> relevance_judgments ,Vector<String[]> rankData) {
+		
+				/*
+				 * See about cleaning up the number of vector variables so there aren't as many (if possible)
+				 */
+				// | 0 | query | 0 | | 1 | sd._did | 1 | | 2 | sd._title | 2 | | 3 | sd._score | 3 |
+				
+		Iterator it = relevance_judgments.iterator();
+        //for (; it.hasNext();){
+			Vector<Integer> docDiD = new Vector<Integer>();
+			Vector<Double> relavence = new Vector<Double>();
+			Vector<String> docQuery = new Vector<String>();
+			Vector<Double> prec = new Vector<Double>();
+			Vector<Double> reca = new Vector<Double>();
+			Vector<Double> f = new Vector<Double>();
+			double[] precATreca = new double[11];
+			Vector<Double> relavenceNDCG = new Vector<Double>();
+			Vector<Double> output = new Vector<Double>();
+			Vector<String> relQuery = new Vector<String>();
+			Vector<Integer> relDiD = new Vector<Integer>();
+			Vector<String> relGrade = new Vector<String>();
+			String q = null;
+			for(int i = 0;i<rankData.size();i++)
+			{
+
+				docQuery.add(rankData.get(i)[0]);
+				docDiD.add(Integer.parseInt(rankData.get(i)[1]));
+			}
+			//System.out.println("RANK DATA SIZE " + rankData.get(1047)[0]);
+			while (it.hasNext()) {
+				// parse the query,did,relevance line
+				//Scanner s = new Scanner(line).useDelimiter("\t");
+				q = it.next().toString();
+				if(q.equals(user_query))
+				{
+				relQuery.add(q);
+				relDiD.add(Integer.parseInt(it.next().toString()));
+				relGrade.add(it.next().toString());
+				}
+				else
+				{
+					it.next();
+					it.next();
+				}
+					
+			}
+			
+			relavence = docRelavence(relQuery,relDiD,relGrade,docQuery,docDiD,user_query);
+			relavenceNDCG = docNDCG(relQuery,relDiD,relGrade,docQuery,docDiD,user_query);
+			// Precision
+			prec.add(evalPrecision(relavence, 1.0));
+			prec.add(evalPrecision(relavence, 5.0));
+			prec.add(evalPrecision(relavence, 10.0));
+			//
+			// Recall
+			reca.add(evalRecall(relavence, 1.0));
+			reca.add(evalRecall(relavence, 5.0));
+			reca.add(evalRecall(relavence, 10.0));
+			// 
+			// F-value
+			for (int i = 0; i < prec.size(); i++) {
+				f.add(evalF(prec.get(i), reca.get(i)));
+				//System.out.println("F-measure: " + f.get(i));
+			}
+			//
+
+			// Add to output
+			for (int j = 0;j<prec.size();j++){
+				output.add(prec.get(j));
+			}
+			for (int k = 0;k<prec.size();k++){
+				output.add(reca.get(k));
+			}
+			for (int k = 0;k<f.size();k++){
+				output.add(f.get(k));
+			}
+			// precision at recall value
+			precATreca = evalPreciAtRecall(relavence ,prec,reca);
+				for (int m = 0;m<precATreca.length;m++)
+				{
+				output.add(precATreca[m]);
+				}
+			//
+			// Average Precision
+				output.add(evalAvgPrecision(relavence));
+			
+			// NDCG
+					output.add(evalNDCG(relavenceNDCG));
+			//
+			// Reciprocal
+					output.add(evalReciprocal(relavence));
+			//
+        //}
+
+		return output;
 	}
 
 	public static double evalPrecision(Vector<Double> relavence, double k_value) {
@@ -276,8 +312,8 @@ class Evaluator {
 		for (int i = 0; i < k_value; i++) {
 			score += relavence.get(i);
 		}
-		System.out.println("Evaluation for Precision @ " + k_value + " is "
-				+ score / k_value);
+		//System.out.println("Evaluation for Precision @ " + k_value + " is "
+				//+ score / k_value);
 		return score / k_value;
 	}
 
@@ -297,11 +333,11 @@ class Evaluator {
 			score += relavence.get(k);
 		}
 		if (totalRel == 0) {
-			System.out.println("Evaluation for Recall @ " + k_value + " is 0.0");
+			//System.out.println("Evaluation for Recall @ " + k_value + " is 0.0");
 			return 0.0;
 		} else {
-			System.out.println("Evaluation for Recall @ " + k_value + " is "
-					+ score / totalRel);
+			//System.out.println("Evaluation for Recall @ " + k_value + " is "
+					//+ score / totalRel);
 			return score / totalRel;
 		}
 	}
@@ -349,35 +385,9 @@ class Evaluator {
 		}
 		for(int i=0;i<precisionsAtRecall.length;i++)
 		{
-			System.out.print(precisionsAtRecall[i] + " |");
+			//System.out.print(precisionsAtRecall[i] + " |");
 		}
 		return precisionsAtRecall;
-		/*
-		double score = 0.0;
-		double[] temp = new double[11];
-		int index = 0;
-		// 0.0 1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0
-		// 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 01.0
-		for(int i = 0;i<precision.size();i++)
-		{
-			index = (int) (recall.get(i)*10);
-			if (precision.get(i) > temp[index])
-			{
-				temp[index] = precision.get(i);
-				for(int j = index+1;j<11;j++)
-				{
-					temp[j] = precision.get(i);
-				}
-			}
-		}
-		System.out.print("| ");
-		for(int i=0;i<temp.length;i++)
-		{
-			System.out.print(temp[i] + " |");
-		}
-		System.out.println("");
-		return temp;
-		*/
 
 	}
 	public static double evalAvgPrecision(Vector<Double> relavence)
@@ -397,7 +407,7 @@ class Evaluator {
 
 		//	System.out.println("At " + (i+1) + " the score is " + score + " the Avg Preision is " + AP / score);
 		}
-		System.out.println("Evaluation for AVG Precision is " + AP / score);
+		//System.out.println("Evaluation for AVG Precision is " + AP / score);
 		return AP / score;
 	}
 	public static double evalNDCG(Vector<Double> relavence)
@@ -410,7 +420,7 @@ class Evaluator {
 		Collections.reverse(relavence);
 		sortedDCG = evalSortedDCG(relavence);
 		NDCG = DCG/sortedDCG;
-		System.out.println("NDCG is " + NDCG);
+		//System.out.println("NDCG is " + NDCG);
 
 		return NDCG;
 	}
@@ -451,73 +461,54 @@ class Evaluator {
 			index++;
 		}
 		score = 1.0 / index;
-		System.out.println("Reciprocal is " + score);
+		//System.out.println("Reciprocal is " + score);
 		return score;
 
 	}
-	public static void readRelevanceJudgments(String p,
-			HashMap<String, HashMap<Integer, Double>> relevance_judgments) {
+	
+	public static Vector<String> getQueries(String file){
+		Vector<String> queries = new Vector<String>();
 		try {
-			BufferedReader reader = new BufferedReader(new FileReader(p));
+			BufferedReader reader = new BufferedReader(new FileReader("data\\queries.tsv"));
 			try {
 				String line = null;
-				while ((line = reader.readLine()) != null) {
-					// parse the query,did,relevance line
-					Scanner s = new Scanner(line).useDelimiter("\t");
-					String query = s.next();
-					int did = Integer.parseInt(s.next());
-					String grade = s.next();
-					double rel = 0.0;
-					// convert to binary relevance
-					if ((grade.equals("Perfect"))
-							|| (grade.equals("Excellent"))
-							|| (grade.equals("Good"))) {
-						rel = 1.0;
-					}
-					if (relevance_judgments.containsKey(query) == false) {
-						HashMap<Integer, Double> qr = new HashMap<Integer, Double>();
-						relevance_judgments.put(query, qr);
-					}
-					HashMap<Integer, Double> qr = relevance_judgments
-							.get(query);
-					qr.put(did, rel);
+				while ((line = reader.readLine()) != null){
+					queries.add(line);
 				}
 			} finally {
 				reader.close();
 			}
-		} catch (IOException ioe) {
+		}catch (IOException ioe){
 			System.err.println("Oops " + ioe.getMessage());
 		}
+		return queries;
 	}
-
-	public static void evaluateStdin(
-			HashMap<String, HashMap<Integer, Double>> relevance_judgments) {
-		// only consider one query per call
-		try {
-			BufferedReader reader = new BufferedReader(new InputStreamReader(
-					System.in));
-
-			String line = null;
-			double RR = 0.0;
-			double N = 0.0;
-			while ((line = reader.readLine()) != null) {
-				Scanner s = new Scanner(line).useDelimiter("\t");
-				String query = s.next();
-				int did = Integer.parseInt(s.next());
-				String title = s.next();
-				double rel = Double.parseDouble(s.next());
-				if (relevance_judgments.containsKey(query) == false) {
-					throw new IOException("query not found");
-				}
-				HashMap<Integer, Double> qr = relevance_judgments.get(query);
-				if (qr.containsKey(did) != false) {
-					RR += qr.get(did);
-				}
-				++N;
+	
+	public static Vector<Double> evaluateStdin(Vector<String> relevance_judgments, int type) throws IOException {
+		Vector<String> queries =getQueries("data/queries.tsv");
+		Vector<String[]> rankData=new Vector<String[]>();
+		
+		rankData = retrieveRank(type);
+		String query=rankData.get(0)[0];
+		if(!queries.contains(query)){
+			throw new IOException("query not found");
+		}
+		Vector<Double> output=eval(query, relevance_judgments, rankData);
+		System.out.print(query);
+		for(Double d:output){
+			System.out.print("\t"+d);
+		}
+		return output;
+	}
+	
+	public void generateOuput(Vector<String> relevance_judgments){
+		Vector<String> queries =getQueries("data/queries.tsv");
+		for(int i=0;i<=5;++i){
+			//Vector<Double> out=new 
+			Vector<String[]> rankData= retrieveRank(i);
+			for(int j=0;i<queries.size();++j){
+				Vector<Double> out=eval(queries.get(j), relevance_judgments, rankData);
 			}
-			System.out.println(Double.toString(RR / N));
-		} catch (Exception e) {
-			System.err.println("Error:" + e.getMessage());
 		}
 	}
 }

@@ -413,13 +413,9 @@ class Ranker {
 		public int compare(Object obj1, Object obj2){
 			ScoredDocument o1=(ScoredDocument) obj1;
 			ScoredDocument o2=(ScoredDocument) obj2;
-			if(o1._score>o2._score){
-				return -1;
-			}
-			if(o1._score<o2._score){
-				return 1;
-			}
-			return 0;
+			Double s1=new Double(o1._score);
+	    	Double s2=new Double(o2._score);
+	    	return s2.compareTo(s1);
 		}
 	}
 }
