@@ -87,9 +87,9 @@ public class RankerFavorite extends Ranker {
 
 			sumforthisword1 += 
 					(((Math.log(db_freq.get(index))+1.0)/Math.log(2))*
-							(Math.log(_indexer.corpusTermFrequency()/db_freq.get(index))/Math.log(2)))*
+							(Math.log(_indexer.totalTermFrequency()/db_freq.get(index))/Math.log(2)))*
 							(((Math.log(db_freq.get(index))+1.0)/Math.log(2))*
-									(Math.log(_indexer.corpusTermFrequency()/db_freq.get(index))/Math.log(2)));
+									(Math.log(_indexer.totalTermFrequency()/db_freq.get(index))/Math.log(2)));
 
 
 		}
@@ -100,7 +100,7 @@ public class RankerFavorite extends Ranker {
 			index = all.indexOf(db.get(di));
 			sumforthisword = 
 					((Math.log(db_freq.get(index))+1.0)/Math.log(2))*
-					(Math.log(d.termFrequency()/db_freq.get(index))/Math.log(2));
+					(Math.log(_indexer.totalTermFrequency()/db_freq.get(index))/Math.log(2));
 
 			db_freq.set(index, sumforthisword/sumforthisword1);	
 		}
@@ -112,9 +112,9 @@ public class RankerFavorite extends Ranker {
 			qindex = all.indexOf(qv.get(kk));
 			qsumforthisword1 += 
 					(((Math.log(qv_freq.get(qindex))+1.0)/Math.log(2))*
-							(Math.log(_indexer.corpusTermFrequency()/qv_freq.get(qindex))/Math.log(2)))*
+							(Math.log(_indexer._totalTermFrequency/qv_freq.get(qindex))/Math.log(2)))*
 							(((Math.log(qv_freq.get(qindex))+1.0)/Math.log(2))*
-									(Math.log(_indexer.corpusTermFrequency()/qv_freq.get(qindex))/Math.log(2)));
+									(Math.log(_indexer.totalTermFrequency()/qv_freq.get(qindex))/Math.log(2)));
 
 		}
 		qsumforthisword1 = Math.sqrt(qsumforthisword1);
@@ -123,7 +123,7 @@ public class RankerFavorite extends Ranker {
 			qindex = all.indexOf(qv.get(di));
 			qsumforthisword = 
 					((Math.log(qv_freq.get(qindex))+1.0)/Math.log(2))*
-					(Math.log(_indexer.corpusTermFrequency()/qv_freq.get(qindex))/Math.log(2));
+					(Math.log(_indexer.totalTermFrequency()/qv_freq.get(qindex))/Math.log(2));
 
 			qv_freq.set(qindex, qsumforthisword/qsumforthisword1);	
 		}
@@ -133,7 +133,7 @@ public class RankerFavorite extends Ranker {
 		//printCosine(all,db_freq,qv_freq);
 		score = calculateCosine(db_freq, qv_freq);
 
-		return new ScoredDocument(did, d.get_title_string(), score);
+		return new ScoredDocument(doc, score);
   }
   
   private Vector<String> populateAll(Vector<String> dbXqv, Vector<String> all) {
