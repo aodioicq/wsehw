@@ -9,7 +9,8 @@ import java.util.Vector;
 public class DocumentIndexed extends Document {
   private static final long serialVersionUID = 9184892508124423115L;
   public int bodySize;//Document body size
-  public Vector<Integer> documentTermFrequency;//the term frequency of all terms in query
+  public Vector<Integer> documentTermFrequency;//the term frequency of all terms in query, keep the order
+  
 
   public DocumentIndexed(int docid) {
     super(docid);
