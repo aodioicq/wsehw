@@ -32,6 +32,7 @@ public class QueryPhrase extends Query {
 					  break;
 				  }
 			  }
+			  phrase=phrase.replaceAll("\"", "");
 			  _tokens.add(phrase);
 		  }else{
 			  _tokens.add(term);
@@ -41,7 +42,7 @@ public class QueryPhrase extends Query {
   }
   /*
   public static void main(String[] args) {
-	  String a="\"new york\" city";
+	  String a="\"new york\" city \"living condition\"";
 	  System.out.println("original:"+a);
 	  QueryPhrase qp=new QueryPhrase(a);
 	  qp.processQuery();
