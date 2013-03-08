@@ -1,5 +1,6 @@
 package edu.nyu.cs.cs2580;
 
+import java.util.ArrayList;
 import java.util.Vector;
 
 import edu.nyu.cs.cs2580.QueryHandler.CgiArguments;
@@ -69,16 +70,20 @@ public abstract class Ranker {
         return new RankerFavorite(options, arguments, indexer);
       case COSINE:
         // Plug in your cosine Ranker
-        break;
+    	  return new RankerCosine(options, arguments, indexer);
       case QL:
         // Plug in your QL Ranker
-        break;
+    	  return new RankerQL(options, arguments, indexer);
       case PHRASE:
         // Plug in your phrase Ranker
-        break;
+    	  return new RankerPhrase(options, arguments, indexer);
       case LINEAR:
         // Plug in your linear Ranker
-        break;
+        ArrayList<Ranker> rankers=new ArrayList<Ranker>();
+        rankers.add(new RankerCosine(options, arguments, indexer));
+        rankers.add(new RankerQL(options, arguments, indexer));
+        rankers.add(new RankerPhrase(options, arguments, indexer));
+        return new RankerLinear(options, arguments, indexer,rankers);
       case NONE:
         // Fall through intended
       default:
