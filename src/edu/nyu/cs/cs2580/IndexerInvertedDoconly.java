@@ -183,7 +183,7 @@ public class IndexerInvertedDoconly extends Indexer {
 		// have to device a data structure to keep track of how many times the term is used
 		return _terms.get(term);
 	}
-
+//
 	@Override
 	public int documentTermFrequency(String term, String url) {
 		SearchEngine.Check(false, "Not implemented!");
