@@ -234,6 +234,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 		 */
 		for (int i = 0; i < word.size(); i++) {
 			tempDid.add(_freqOffset.get(word.get(i)));
+			
 		}
 		did = getOnlyDid(tempDid);
 		/*
@@ -261,7 +262,17 @@ public class IndexerInvertedOccurrence extends Indexer {
 			}
 			index++;
 		}
-		return _allDocs.get(match);
+		if(match == docid) {
+			return new DocumentIndexed(Integer.MAX_VALUE);
+		} else {
+			// updates the term frequency in the document
+			DocumentIndexed tempDI = _allDocs.get(match);
+			for (int i = 0;i<word.size();i++) {
+				// I believe it is match that is the current document id
+			tempDI.documentTermFrequency.add(documentTermFrequency(word.get(i),match));
+			}
+		return tempDI;
+		}
 	}
 
 	@Override
@@ -296,7 +307,19 @@ public class IndexerInvertedOccurrence extends Indexer {
 		}
 		return numTerm;
 	}
-
+	// Returns the number of instances of the query in the document
+	public int documentTermFrequency(String term,int docid) {
+		Vector<Vector<Integer>> termVector = new Vector<Vector<Integer>>();
+		Vector<Vector<Integer>> temp = new Vector<Vector<Integer>>();
+		int didIndex = 0;
+		int freqIndex = 0;
+		termVector.add(_freqOffset.get(term));
+		// Gets the vector of did
+		temp = getOnlyDid(termVector);
+		didIndex = temp.get(0).indexOf(docid);  
+		freqIndex = didIndex+1;
+		return _freqOffset.get(term).get(freqIndex);
+	}
 	@Override
 	public int documentTermFrequency(String term, String url) {
 		SearchEngine.Check(false, "Not implemented!");
