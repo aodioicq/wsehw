@@ -150,12 +150,12 @@ public class IndexerInvertedOccurrence extends Indexer {
 					// Splits off to avoid memory limitations
 					if(did==partStart+3) {
 						partStart = did+1;
-						save(part);
+						saveToFile(part);
 						part++;
 					}
 					termOffset = 0;
 				}
-				save(part);
+				saveToFile(part);
 				
 			} finally {
 				reader.close();
@@ -164,7 +164,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 			System.err.println("Oops " + ioe.getMessage());
 		}
 	}
-	public void save(int part) {
+	public void saveToFile(int part) {
 		String newline = System.getProperty("line.separator");
 		char letter = 'a';
 		String out = " ";
@@ -214,7 +214,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 		_freqOffset = new HashMap<String,Vector<Integer>>();
 	}
 
-	public void load(char c) {
+	public void loadFromFile(char c) {
 		final String charName = String.valueOf(c).toLowerCase();
 		if(_freqOffset == null) {
 		_freqOffset = new HashMap<String, Vector<Integer>>();
