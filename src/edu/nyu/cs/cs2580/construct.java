@@ -3,6 +3,7 @@ package edu.nyu.cs.cs2580;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileFilter;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -17,6 +18,8 @@ import java.util.TreeMap;
 import java.util.Vector;
 import java.util.regex.Pattern;
 
+import edu.nyu.cs.cs2580.SearchEngine.Options;
+
 
 public class construct {
 
@@ -30,7 +33,7 @@ public class construct {
 	 */
 
 	public static void main(String[] args) {
-		constructIndex();
+	//	constructIndex();
 	//	System.out.println(_freqOffset.get("a"));
 	//	load('c');
 	//	load('w');
@@ -49,7 +52,7 @@ public class construct {
 		//System.out.println(getPhraseVector(s));
 
 	}
-	public static void constructIndex() {
+	public static void constructIndex(Options _options) {
 		//String corpusFile = _options._corpusPrefix;
 		String corpusFile="data/wiki";
 	    System.out.println("Construct index from: " + corpusFile);
@@ -73,7 +76,6 @@ public class construct {
 		
 		int partStart = 0;
 		int part = 1;
-		//boolean code = false;
 		for (int i = 0; i < files.length; i++) {
 			termOffset = 0;
 			String filename=corpusFile + "/"+files[i].getName();
@@ -81,84 +83,57 @@ public class construct {
 			DocumentIndexed d = new DocumentIndexed(did);
 			_allDocs.add(d);
 			int pos=0;
-			try {
-				BufferedReader reader = new BufferedReader(new FileReader(filename));
-				try {	
-					while ((line = reader.readLine()) != null) {
-						// For my own test file
-						//word = line.split("[ .,?!:\"]+");
-						String notags=Html2Text(line);
-						Scanner s=new Scanner(notags);
-						//for (int i = 0; i < word.length; i++) {
-						while(s.hasNext()){
-							String word=s.next();
-							word=stem(word.toLowerCase());
-							// Gets the location of the current word in the document
-							//word[i] = stem(word[i].toLowerCase());
-							// creates a new temporary vector for every new word
-							temp = new Vector<Integer>();
-							// if(!word[i].startsWith("<") && code == false) {
-							// Very first instance where the word is entered into the map
-							if (!_freqOffset.containsKey(word)) {
-								temp.add(did);
-								temp.add(1);
-								temp.add(termOffset);
-							} else {
-	
-								temp = _freqOffset.get(word);
-	
-								didIndex = getCurrentDidIndex(did, temp);
-								if (didIndex == -1) {
-									// case where it is the first instance in a new document after
-									// the initial indexing
-									temp.add(did);
-									temp.add(1);
-									temp.add(termOffset);
-								} else {
-									// Updates the frequency and adds the offset
-									freqIndex = didIndex + 1;
-									freq = temp.get(freqIndex);
-									freq++;
-									temp.set(freqIndex, freq);
-									temp.add(termOffset);
-								}
-							}
-							termOffset++;
-							_freqOffset.put(word, temp);
-					/*	}
-							 else {
-							// Checks to make sure the word is not non-visible page content such
-							// as <Script>
-									code = true;
-									if(word[i].endsWith(">")) {
-										code = false;
-									}
-							 } */
-						} 
-						// Somehow need to save the bodysize
-						
-						//did++;
-						// Splits off to avoid memory limitations
-						
-						//termOffset = 0;
+			String content=readToString(filename);
+			content=Html2Text(content);
+			Scanner s=new Scanner(content);
+			while(s.hasNext()){
+				String word=s.next();
+				word=stem(word.toLowerCase());
+				temp = new Vector<Integer>();
+				if (!_freqOffset.containsKey(word)) {
+					temp.add(did);
+					temp.add(1);
+					temp.add(termOffset);
+				} else {
+
+					temp = _freqOffset.get(word);
+
+					didIndex = getCurrentDidIndex(did, temp);
+					if (didIndex == -1) {
+						// case where it is the first instance in a new document after
+						// the initial indexing
+						temp.add(did);
+						temp.add(1);
+						temp.add(termOffset);
+					} else {
+						// Updates the frequency and adds the offset
+						freqIndex = didIndex + 1;
+						freq = temp.get(freqIndex);
+						freq++;
+						temp.set(freqIndex, freq);
+						temp.add(termOffset);
 					}
-					save(part);
-					
-				} finally {
-					reader.close();
 				}
-			} catch (IOException ioe) {
-				System.err.println("Oops " + ioe.getMessage());
+				termOffset++;
+				_freqOffset.put(word, temp);
 			}
+			
 			d.bodySize = termOffset + 1;
+			/*
+			save(part);
 			if(did==partStart+3) {
 				partStart = did+1;
 				save(part);
 				part++;
+			}*/
+			if(did>part*200){
+				save(part);
+				part++;
+				_freqOffset.clear();
 			}
 			did++;
-			
 		}
+		save(part);
 	}
 	public static void save(int part) {
 		String newline = System.getProperty("line.separator");
@@ -264,10 +239,10 @@ public class construct {
 		int len=word.length();
 		char s=word.charAt(0);
 		char e=word.charAt(len-1);
-		if(!Character.isAlphabetic(s)){
+		if(!Character.isLetterOrDigit(s)){
 			word=word.substring(1);
 		}
-		if(!Character.isAlphabetic(e)){
+		if(!Character.isLetterOrDigit(e)){
 			word=word.substring(0,len-1);
 		}
 		if (word.endsWith("s") && word.length() > 1) {
@@ -594,8 +569,24 @@ public class construct {
 		return _freqOffset.get(term).get(freqIndex);
 	}
 	
+	public static String readToString(String fileName) {  
+        File file = new File(fileName);  
+        Long filelength = file.length();  
+        byte[] filecontent = new byte[filelength.intValue()];  
+        try {  
+            FileInputStream in = new FileInputStream(file);  
+            in.read(filecontent);  
+            in.close();  
+        } catch (FileNotFoundException e) {  
+            e.printStackTrace();  
+        } catch (IOException e) {  
+            e.printStackTrace();  
+        }   
+            return new String(filecontent);  
+    }  
+	
 	public static String Html2Text(String inputString) { 
-        String htmlStr = inputString; //含html标签的字符串 
+        String htmlStr = inputString; 
             String textStr =""; 
       java.util.regex.Pattern p_script; 
       java.util.regex.Matcher m_script; 
@@ -605,21 +596,21 @@ public class construct {
       java.util.regex.Matcher m_html; 
    
       try { 
-       String regEx_script = "<[\\s]*?script[^>]*?>[\\s\\S]*?<[\\s]*?\\/[\\s]*?script[\\s]*?>"; //定义script的正则表达式{或<script[^>]*?>[\\s\\S]*?<\\/script> } 
-       String regEx_style = "<[\\s]*?style[^>]*?>[\\s\\S]*?<[\\s]*?\\/[\\s]*?style[\\s]*?>"; //定义style的正则表达式{或<style[^>]*?>[\\s\\S]*?<\\/style> } 
-          String regEx_html = "<[^>]+>"; //定义HTML标签的正则表达式 
+       String regEx_script = "<[\\s]*?script[^>]*?>[\\s\\S]*?<[\\s]*?\\/[\\s]*?script[\\s]*?>"; 
+       String regEx_style = "<[\\s]*?style[^>]*?>[\\s\\S]*?<[\\s]*?\\/[\\s]*?style[\\s]*?>"; 
+          String regEx_html = "<[^>]+>"; 
       
           p_script = Pattern.compile(regEx_script,Pattern.CASE_INSENSITIVE); 
           m_script = p_script.matcher(htmlStr); 
-          htmlStr = m_script.replaceAll(""); //过滤script标签 
+          htmlStr = m_script.replaceAll(""); 
 
           p_style = Pattern.compile(regEx_style,Pattern.CASE_INSENSITIVE); 
           m_style = p_style.matcher(htmlStr); 
-          htmlStr = m_style.replaceAll(""); //过滤style标签 
+          htmlStr = m_style.replaceAll(""); 
       
           p_html = Pattern.compile(regEx_html,Pattern.CASE_INSENSITIVE); 
           m_html = p_html.matcher(htmlStr); 
-          htmlStr = m_html.replaceAll(""); //过滤html标签 
+          htmlStr = m_html.replaceAll(""); 
       
        textStr = htmlStr; 
       
@@ -627,6 +618,7 @@ public class construct {
                System.err.println("Html2Text: " + e.getMessage()); 
       } 
    
-      return textStr;//返回文本字符串 
+      return textStr;
       }   
+  
 }
