@@ -178,7 +178,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 		
 			BufferedWriter os = new BufferedWriter(new FileWriter("data/index/"
 					+ letter + ".idx.part" + part));
-		
+	
 			if(tm.firstKey().startsWith(""))
 			{
 				tm.remove(tm.firstKey());
