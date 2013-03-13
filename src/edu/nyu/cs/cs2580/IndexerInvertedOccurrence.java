@@ -69,6 +69,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 		}
 		return word;
 	}
+	
 	@Override
 	public void constructIndex() throws IOException {
 		_freqOffset = new HashMap<String, Vector<Integer>>();
