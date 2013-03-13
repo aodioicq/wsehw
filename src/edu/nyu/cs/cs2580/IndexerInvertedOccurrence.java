@@ -21,12 +21,14 @@ import edu.nyu.cs.cs2580.SearchEngine.Options;
  */
 public class IndexerInvertedOccurrence extends Indexer {
 
-	private static HashMap<String, Vector<Integer>> _freqOffset;
+	private HashMap<String, Vector<Integer>> _freqOffset;
 	public Vector<DocumentIndexed> _allDocs;
 	private String index_source;
+	private int numDoc;
 
 	public IndexerInvertedOccurrence(Options options) {
 		super(options);
+		numDoc = 0;
 		System.out.println("Using Indexer: " + this.getClass().getSimpleName());
 	}
 
