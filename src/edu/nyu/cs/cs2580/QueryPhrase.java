@@ -1,5 +1,6 @@
 package edu.nyu.cs.cs2580;
 
+import java.util.Arrays;
 import java.util.Scanner;
 import java.util.Vector;
 
@@ -23,17 +24,23 @@ public class QueryPhrase extends Query {
 	  while (s.hasNext()) {
 		  String term=s.next();
 		  if(term.charAt(0)=='"'){
+			  boolean ifend=false;
 			  String phrase="";
 			  phrase+=term;
 			  while(s.hasNext()){
 				  String t=s.next();
 				  phrase=phrase+" "+t;
 				  if(t.charAt(t.length()-1)=='"'){
+					  ifend=true;
 					  break;
 				  }
 			  }
 			  phrase=phrase.replaceAll("\"", "");
-			  _tokens.add(phrase);
+			  if(ifend){
+				  _tokens.add(phrase);
+			  }else{
+				  _tokens.addAll(Arrays.asList(phrase.split(" ")));
+			  }
 		  }else{
 			  _tokens.add(term);
 		  }

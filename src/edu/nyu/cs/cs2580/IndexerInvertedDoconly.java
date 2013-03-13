@@ -126,6 +126,7 @@ public class IndexerInvertedDoconly extends Indexer {
 	@Override
 	public Document nextDoc(Query query, int docid) {
 		Vector < Vector < Integer > > did = new Vector < Vector < Integer > >();
+		query.processQuery();
 		Vector < String > word = query._tokens;
 		Vector < Integer > temp = new Vector < Integer >();
 		int match = docid;
