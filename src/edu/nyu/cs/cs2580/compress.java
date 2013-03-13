@@ -8,7 +8,6 @@ public class compress {
 		// System.out.println("integer: " +i);
 		String s = Integer.toBinaryString(i);
 		String sNew = "";
-
 		StringBuffer strbuffer2 = new StringBuffer();
 		StringBuffer strbuffer3 = new StringBuffer();
 		StringBuffer strbuffer;

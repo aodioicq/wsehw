@@ -11,17 +11,13 @@ public class decompress {
 			p = Integer.parseInt(s, 16);
 			int k1 = p - 128;
 			result = k1;
-		}
-
-		else if (len > 2 && len <= 5) {
+		} else if (len > 2 && len <= 5) {
 
 			String s1 = s.substring(2, len);
 			p = Integer.parseInt(s1, 16);
 			result = p;
-		}
-
-		else if (len > 5 && len <= 6) {
-
+		} else if (len > 5 && len <= 6) {
+ 
 			String s1 = s.substring(2, len);
 			p = Integer.parseInt(s1, 16);
 			result = p;

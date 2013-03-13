@@ -216,7 +216,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 			e.printStackTrace();
 		}
 		// maybe we don't have to clear this
-	//	_allDocs = new Vector<DocumentIndexed>();
+		// _allDocs = new Vector<DocumentIndexed>();
 		_freqOffset = new HashMap<String, Vector<Integer>>();
 	}
 

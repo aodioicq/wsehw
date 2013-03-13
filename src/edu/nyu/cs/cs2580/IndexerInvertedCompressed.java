@@ -26,12 +26,12 @@ public class IndexerInvertedCompressed extends Indexer {
 	public Vector<DocumentIndexed> _allDocs;
 	private String index_source;
 	private int numDoc;
-	
-  public IndexerInvertedCompressed(Options options) {
-    super(options);
-    numDoc = 0;
-    System.out.println("Using Indexer: " + this.getClass().getSimpleName());
-  }
+
+	public IndexerInvertedCompressed(Options options) {
+		super(options);
+		numDoc = 0;
+		System.out.println("Using Indexer: " + this.getClass().getSimpleName());
+	}
 
 	private String stem(String word) {
 		if (word.endsWith("s") && word.length() > 1) {
@@ -92,7 +92,7 @@ public class IndexerInvertedCompressed extends Indexer {
 		int partStart = 0;
 		int part = 1;
 		boolean code = false;
-		
+
 		try {
 			BufferedReader reader = new BufferedReader(new FileReader(
 					index_source));
@@ -140,7 +140,7 @@ public class IndexerInvertedCompressed extends Indexer {
 								}
 							}
 							termOffset = i + 1;
-							
+
 							_freqOffset.put(word[i], temp);
 						} else {
 							// Checks to make sure the word is not non-visible
@@ -172,14 +172,16 @@ public class IndexerInvertedCompressed extends Indexer {
 			System.err.println("Oops " + ioe.getMessage());
 		}
 	}
-	public Vector <String> compressVector(Vector <Integer> toCompress) {
+
+	public Vector<String> compressVector(Vector<Integer> toCompress) {
 		compress hex = new compress();
-		Vector <String> compressed = new Vector<String>();
-		for(Integer i : toCompress) {
+		Vector<String> compressed = new Vector<String>();
+		for (Integer i : toCompress) {
 			compressed.add(hex.convert(i));
 		}
 		return compressed;
 	}
+
 	public void saveToFile(int part) {
 		String newline = System.getProperty("line.separator");
 		char letter = 'a';
@@ -204,7 +206,8 @@ public class IndexerInvertedCompressed extends Indexer {
 			for (Entry<String, Vector<Integer>> entry : tm.entrySet()) {
 				String key = entry.getKey();
 				if (key.charAt(0) == letter) {
-					out = entry.getKey() + "\t" + compressVector(entry.getValue());
+					out = entry.getKey() + "\t"
+							+ compressVector(entry.getValue());
 					os.write(out);
 					os.write(newline);
 				} else {
@@ -212,7 +215,8 @@ public class IndexerInvertedCompressed extends Indexer {
 					letter = key.charAt(0);
 					os = new BufferedWriter(new FileWriter("data/index/"
 							+ letter + ".idx.part" + part));
-					out = entry.getKey() + "\t" + compressVector(entry.getValue());
+					out = entry.getKey() + "\t"
+							+ compressVector(entry.getValue());
 					os.write(out);
 					os.write(newline);
 				}
@@ -226,7 +230,7 @@ public class IndexerInvertedCompressed extends Indexer {
 			e.printStackTrace();
 		}
 		// maybe we don't have to clear this
-	//	_allDocs = new Vector<DocumentIndexed>();
+		// _allDocs = new Vector<DocumentIndexed>();
 		_freqOffset = new HashMap<String, Vector<Integer>>();
 	}
 
