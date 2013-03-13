@@ -151,7 +151,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 					d.bodySize = termOffset + 1;
 					did++;
 					// Splits off to avoid memory limitations
-					if (did == partStart + 3) {
+					if (did == partStart + 1000) {
 						partStart = did + 1;
 						saveToFile(part);
 						part++;
@@ -213,7 +213,8 @@ public class IndexerInvertedOccurrence extends Indexer {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		_allDocs = new Vector<DocumentIndexed>();
+		// maybe we don't have to clear this
+	//	_allDocs = new Vector<DocumentIndexed>();
 		_freqOffset = new HashMap<String, Vector<Integer>>();
 	}
 
