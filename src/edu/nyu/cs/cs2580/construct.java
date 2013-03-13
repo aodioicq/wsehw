@@ -53,8 +53,8 @@ public class construct {
 
 	}
 	public static void constructIndex(Options _options) {
-		//String corpusFile = _options._corpusPrefix;
-		String corpusFile="data/wiki";
+		String corpusFile = _options._corpusPrefix;
+		//String corpusFile="data/wiki";
 	    System.out.println("Construct index from: " + corpusFile);
 	    
 	    File root = new File(corpusFile);
