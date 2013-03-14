@@ -78,17 +78,17 @@ public class IndexerInvertedOccurrence extends Indexer {
 	@Override
 	public void constructIndex() throws IOException {
 		String corpusFile = _options._corpusPrefix;
-		//String corpusFile="data/wiki";
-	    System.out.println("Construct index from: " + corpusFile);
-	    
-	    File root = new File(corpusFile);
-        File[] files = root.listFiles();
-        
+		// String corpusFile="data/wiki";
+		System.out.println("Construct index from: " + corpusFile);
+
+		File root = new File(corpusFile);
+		File[] files = root.listFiles();
+
 		_freqOffset = new HashMap<String, Vector<Integer>>();
 		_allDocs = new Vector<DocumentIndexed>();
-		//index_source = "data/simple/test.txt";
+		// index_source = "data/simple/test.txt";
 		String line = null;
-		//String[] word = null;
+		// String[] word = null;
 		String[] splitDoc = null;
 		Vector<Integer> temp;
 
@@ -102,17 +102,17 @@ public class IndexerInvertedOccurrence extends Indexer {
 		int part = 1;
 		for (int i = 0; i < files.length; i++) {
 			termOffset = 0;
-			String filename=corpusFile + "/"+files[i].getName();
-			System.out.println("reading "+filename);
+			String filename = corpusFile + "/" + files[i].getName();
+			System.out.println("reading " + filename);
 			DocumentIndexed d = new DocumentIndexed(did);
 			_allDocs.add(d);
-			int pos=0;
-			String content=readToString(filename);
-			content=Html2Text(content);
-			Scanner s=new Scanner(content);
-			while(s.hasNext()){
-				String word=s.next();
-				word=stem(word.toLowerCase());
+			int pos = 0;
+			String content = readToString(filename);
+			content = Html2Text(content);
+			Scanner s = new Scanner(content);
+			while (s.hasNext()) {
+				String word = s.next();
+				word = stem(word.toLowerCase());
 				temp = new Vector<Integer>();
 				if (!_freqOffset.containsKey(word)) {
 					temp.add(did);
@@ -141,24 +141,24 @@ public class IndexerInvertedOccurrence extends Indexer {
 				termOffset++;
 				_freqOffset.put(word, temp);
 			}
-		
-		
-			if(did>part*200){
+
+			if (did > part * 200) {
 				saveToFile(part);
 				part++;
 				_freqOffset.clear();
 			}
-		
+
 			// Stores the corpus term frequency to file
 			File corpusIndex = new File("data/index/occurrences/frequency");
 			if (!corpusIndex.exists()) {
 				corpusIndex.mkdir();
 			}
-			File corpusTerms = new File("data/index/occurrences/frequency/corpusterms.idx");
-			if(corpusTerms.exists()) {
+			File corpusTerms = new File(
+					"data/index/occurrences/frequency/corpusterms.idx");
+			if (corpusTerms.exists()) {
 				BufferedReader is = new BufferedReader(new FileReader(corpusTerms));
 				corpusFreq = Integer.parseInt(is.readLine());
-				corpusFreq+= termOffset;
+				corpusFreq += termOffset;
 				is.close();
 			} else {
 				corpusFreq = termOffset;
@@ -183,8 +183,8 @@ public class IndexerInvertedOccurrence extends Indexer {
 		}
 		try {
 
-			BufferedWriter os = new BufferedWriter(new FileWriter("data/index/occurrences"
-					+ letter + ".idx.part" + part));
+			BufferedWriter os = new BufferedWriter(new FileWriter(
+					"data/index/occurrences" + letter + ".idx.part" + part));
 
 			if (tm.firstKey().startsWith("")) {
 				tm.remove(tm.firstKey());
@@ -217,7 +217,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 			e.printStackTrace();
 		}
 		// maybe we don't have to clear this
-		 _allDocs = new Vector<DocumentIndexed>();
+		_allDocs = new Vector<DocumentIndexed>();
 		_freqOffset = new HashMap<String, Vector<Integer>>();
 	}
 
@@ -258,8 +258,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 					} else {
 						temp = new Vector<Integer>();
 					}
-					freqMap = map[1].substring(1, map[1].length() - 1).split(
-							", ");
+					freqMap = map[1].substring(1, map[1].length() - 1).split(", ");
 					for (int i = 0; i < freqMap.length; i++) {
 						temp.add(Integer.parseInt(freqMap[i]));
 					}
@@ -377,8 +376,8 @@ public class IndexerInvertedOccurrence extends Indexer {
 	}
 
 	/**
-	 * This method gets the did for the case where the index information is
-	 * reset due to adding a different word.
+	 * This method gets the did for the case where the index information is reset
+	 * due to adding a different word.
 	 * 
 	 * @param did
 	 * @param temp
@@ -462,8 +461,8 @@ public class IndexerInvertedOccurrence extends Indexer {
 	 * In HW2, you should be using {@link DocumentIndexed}.
 	 * 
 	 * This nextDoc is similar to IndexerInvertedDoconly's nextDoc with the
-	 * exception of the format of the data. nextDoc formats the vector to
-	 * contain just the did's
+	 * exception of the format of the data. nextDoc formats the vector to contain
+	 * just the did's
 	 */
 	@Override
 	public Document nextDoc(Query query, int docid) {
@@ -477,8 +476,8 @@ public class IndexerInvertedOccurrence extends Indexer {
 		int tempIndex = docid;
 		boolean exist = false;
 		/*
-		 * This for loop first finds the vector in the hashmap that corresponds
-		 * to the query word and then adds it to did
+		 * This for loop first finds the vector in the hashmap that corresponds to
+		 * the query word and then adds it to did
 		 */
 		for (int i = 0; i < word.size(); i++) {
 			tempDid.add(_freqOffset.get(word.get(i)));
@@ -527,8 +526,8 @@ public class IndexerInvertedOccurrence extends Indexer {
 
 			for (int i = 0; i < word.size(); i++) {
 				// I believe it is match that is the current document id
-				tempDI.documentTermFrequency.add(documentTermFrequency(
-						word.get(i), match));
+				tempDI.documentTermFrequency.add(documentTermFrequency(word.get(i),
+						match));
 			}
 			return tempDI;
 		}
@@ -586,56 +585,56 @@ public class IndexerInvertedOccurrence extends Indexer {
 		return 0;
 	}
 
-	public static String readToString(String fileName) {  
-        File file = new File(fileName);  
-        Long filelength = file.length();  
-        byte[] filecontent = new byte[filelength.intValue()];  
-        try {  
-            FileInputStream in = new FileInputStream(file);  
-            in.read(filecontent);  
-            in.close();  
-        } catch (FileNotFoundException e) {  
-            e.printStackTrace();  
-        } catch (IOException e) {  
-            e.printStackTrace();  
-        }   
-            return new String(filecontent);  
-    }  
+	public static String readToString(String fileName) {
+		File file = new File(fileName);
+		Long filelength = file.length();
+		byte[] filecontent = new byte[filelength.intValue()];
+		try {
+			FileInputStream in = new FileInputStream(file);
+			in.read(filecontent);
+			in.close();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return new String(filecontent);
+	}
 
-	public static String Html2Text(String inputString) { 
-        String htmlStr = inputString; 
-            String textStr =""; 
-      java.util.regex.Pattern p_script; 
-      java.util.regex.Matcher m_script; 
-      java.util.regex.Pattern p_style; 
-      java.util.regex.Matcher m_style; 
-      java.util.regex.Pattern p_html; 
-      java.util.regex.Matcher m_html; 
-   
-      try { 
-       String regEx_script = "<[\\s]*?script[^>]*?>[\\s\\S]*?<[\\s]*?\\/[\\s]*?script[\\s]*?>"; 
-       String regEx_style = "<[\\s]*?style[^>]*?>[\\s\\S]*?<[\\s]*?\\/[\\s]*?style[\\s]*?>"; 
-          String regEx_html = "<[^>]+>"; 
-      
-          p_script = Pattern.compile(regEx_script,Pattern.CASE_INSENSITIVE); 
-          m_script = p_script.matcher(htmlStr); 
-          htmlStr = m_script.replaceAll(""); 
+	public static String Html2Text(String inputString) {
+		String htmlStr = inputString;
+		String textStr = "";
+		java.util.regex.Pattern p_script;
+		java.util.regex.Matcher m_script;
+		java.util.regex.Pattern p_style;
+		java.util.regex.Matcher m_style;
+		java.util.regex.Pattern p_html;
+		java.util.regex.Matcher m_html;
 
-          p_style = Pattern.compile(regEx_style,Pattern.CASE_INSENSITIVE); 
-          m_style = p_style.matcher(htmlStr); 
-          htmlStr = m_style.replaceAll(""); 
-      
-          p_html = Pattern.compile(regEx_html,Pattern.CASE_INSENSITIVE); 
-          m_html = p_html.matcher(htmlStr); 
-          htmlStr = m_html.replaceAll(""); 
-      
-       textStr = htmlStr; 
-      
-      }catch(Exception e) { 
-               System.err.println("Html2Text: " + e.getMessage()); 
-      } 
-   
-      return textStr;
-      }   
-  
+		try {
+			String regEx_script = "<[\\s]*?script[^>]*?>[\\s\\S]*?<[\\s]*?\\/[\\s]*?script[\\s]*?>";
+			String regEx_style = "<[\\s]*?style[^>]*?>[\\s\\S]*?<[\\s]*?\\/[\\s]*?style[\\s]*?>";
+			String regEx_html = "<[^>]+>";
+
+			p_script = Pattern.compile(regEx_script, Pattern.CASE_INSENSITIVE);
+			m_script = p_script.matcher(htmlStr);
+			htmlStr = m_script.replaceAll("");
+
+			p_style = Pattern.compile(regEx_style, Pattern.CASE_INSENSITIVE);
+			m_style = p_style.matcher(htmlStr);
+			htmlStr = m_style.replaceAll("");
+
+			p_html = Pattern.compile(regEx_html, Pattern.CASE_INSENSITIVE);
+			m_html = p_html.matcher(htmlStr);
+			htmlStr = m_html.replaceAll("");
+
+			textStr = htmlStr;
+
+		} catch (Exception e) {
+			System.err.println("Html2Text: " + e.getMessage());
+		}
+
+		return textStr;
+	}
+
 }
