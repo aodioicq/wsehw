@@ -144,7 +144,7 @@ public class IndexerInvertedDoconly extends Indexer {
 				} else {
 					os.close();
 					letter = key.charAt(0);
-					os = new BufferedWriter(new FileWriter("data/index/occurrences"
+					os = new BufferedWriter(new FileWriter("data/index/doc"
 							+ letter + ".idx.part" + part));
 					out = entry.getKey() + "\t" + entry.getValue().toString();
 					os.write(out);
