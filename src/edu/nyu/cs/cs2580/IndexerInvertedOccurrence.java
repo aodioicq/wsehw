@@ -84,6 +84,7 @@ public class IndexerInvertedOccurrence extends Indexer {
         File[] files = root.listFiles();
         
         String constants=_options._indexPrefix+"/occurrences/constant.idx";
+        //String constants="data/index/occurrences/constant.idx";
         BufferedWriter bw = new BufferedWriter(new FileWriter(constants,true));
         
 		_freqOffset = new HashMap<String, Vector<Integer>>();
@@ -101,7 +102,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 		for (int i = 0; i < files.length; i++) {
 			termOffset = 0;
 			String filename=corpusFile + "/"+files[i].getName();
-			System.out.println("reading "+filename);
+			//System.out.println("reading "+filename);
 			//DocumentIndexed d = new DocumentIndexed(did);
 			//_allDocs.add(d);
 			int pos=0;
@@ -156,6 +157,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 		}
 		saveToFile(part);
 		// Stores the corpus term frequency to file
+		
 		File corpusIndex = new File(_options._indexPrefix+"/occurrences/frequency");
 		if (!corpusIndex.exists()) {
 			corpusIndex.mkdir();
@@ -172,8 +174,8 @@ public class IndexerInvertedOccurrence extends Indexer {
 		String out = " ";
 		TreeMap<String, Vector<Integer>> tm = new TreeMap<String, Vector<Integer>>(
 				_freqOffset);
-		//String prefix=_options._indexPrefix+"/occurrences";
-		String prefix="data/index/occurrences";
+		String prefix=_options._indexPrefix+"/occurrences";
+		//String prefix="data/index/occurrences";
 		File f = new File(prefix);
 		if (!f.exists()) {
 			f.mkdir();
@@ -415,6 +417,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 
 	@Override
 	public void loadIndex() throws IOException, ClassNotFoundException {
+		
 		String constantFile = _options._indexPrefix + "/occurance/constant.idx";
 		BufferedReader reader = new BufferedReader(new FileReader(constantFile));
 	    try {

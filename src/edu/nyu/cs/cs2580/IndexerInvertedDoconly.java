@@ -16,9 +16,6 @@ import java.util.TreeMap;
 import java.util.Vector;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
-
-import com.sun.org.apache.xerces.internal.dom.DocumentImpl;
-
 import edu.nyu.cs.cs2580.SearchEngine.Options;
 
 /**
@@ -65,14 +62,19 @@ public class IndexerInvertedDoconly extends Indexer {
 		}
 	@Override
 	public void constructIndex() throws IOException {
-		//String corpusFile = _options._corpusPrefix;
-		String corpusFile="data/wiki";
+		String corpusFile = _options._corpusPrefix;
+		//String corpusFile="data/wiki";
 	    System.out.println("Construct index from: " + corpusFile);
 	    
 	    File root = new File(corpusFile);
         File[] files = root.listFiles();
         
-        String constants=_options._indexPrefix+"/doc/constant.idx";
+        
+		File f = new File(_options._indexPrefix+"/doc");
+		if (!f.exists()) {
+			f.mkdir();
+		}
+		String constants=_options._indexPrefix+"/doc/constant.idx";
         BufferedWriter bw = new BufferedWriter(new FileWriter(constants,true));
         
         _postingsList = new HashMap<String, Vector<Integer>>();
@@ -127,8 +129,8 @@ public class IndexerInvertedDoconly extends Indexer {
 		String out = " ";
 		TreeMap<String, Vector<Integer>> tm = new TreeMap<String, Vector<Integer>>(
 				_postingsList);
-		//String prefix=_options._indexPrefix+"/doc";
-		String prefix="data/index/doc";
+		String prefix=_options._indexPrefix+"/doc";
+		//String prefix="data/index/doc";
 		File f = new File(prefix);
 		if (!f.exists()) {
 			f.mkdir();
@@ -189,7 +191,7 @@ public class IndexerInvertedDoconly extends Indexer {
 		String[] map = { "" };
 		String[] freqMap = { "" };
 		Vector<Integer> temp;
-		File file = new File("data/index/occurrences");
+		File file = new File(_options._indexPrefix+"/occurrences");
 
 		// Filters files by name
 		FilenameFilter textFilter = new FilenameFilter() {
@@ -233,7 +235,9 @@ public class IndexerInvertedDoconly extends Indexer {
 
 	@Override
 	public void loadIndex() throws IOException, ClassNotFoundException {
+		_allDocs=new Vector < DocumentIndexed >();
 		String constantFile = _options._indexPrefix + "/doc/constant.idx";
+		//String constantFile = "data/index/doc/constant.idx";
 		BufferedReader reader = new BufferedReader(new FileReader(constantFile));
 	    try {
 	      String line = null;
@@ -248,6 +252,7 @@ public class IndexerInvertedDoconly extends Indexer {
 	    } finally {
 	      reader.close();
 	    }
+	    //System.out.println(_allDocs.size());
 	}
 
 	@Override
