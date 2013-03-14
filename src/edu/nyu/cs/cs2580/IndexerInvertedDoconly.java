@@ -1,10 +1,21 @@
 package edu.nyu.cs.cs2580;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.FilenameFilter;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Scanner;
+import java.util.TreeMap;
 import java.util.Vector;
+import java.util.Map.Entry;
+import java.util.regex.Pattern;
 
 import edu.nyu.cs.cs2580.SearchEngine.Options;
 
@@ -53,61 +64,155 @@ public class IndexerInvertedDoconly extends Indexer {
 		}
 	@Override
 	public void constructIndex() throws IOException {
+		String corpusFile = _options._corpusPrefix;
+		//String corpusFile="data/wiki";
+	    System.out.println("Construct index from: " + corpusFile);
+	    
+	    File root = new File(corpusFile);
+        File[] files = root.listFiles();
+        
 		_documents = new HashMap<String, Vector<Integer>>();
-  	_allDocs = new Vector <DocumentIndexed>();
-  	_terms = new HashMap <String,Integer>();
-		index_source = "/";
+		_allDocs = new Vector<DocumentIndexed>();
+		//index_source = "data/simple/test.txt";
+		String line = null;
+	
+		Vector<Integer> temp;
+		int did = 0;
+		int didIndex = 0;
+		int part = 1;
+		for (int i = 0; i < files.length; i++) {
+			String filename=corpusFile + "/"+files[i].getName();
+			System.out.println("reading "+filename);
+			DocumentIndexed d = new DocumentIndexed(did);
+			_allDocs.add(d);
+			int pos=0;
+			String content=readToString(filename);
+			content=Html2Text(content);
+			Scanner s=new Scanner(content);
+			while(s.hasNext()){
+				String word=s.next();
+				word=stem(word.toLowerCase());
+				temp = new Vector<Integer>();
+				if (!_documents.containsKey(word)) {
+					temp.add(did);
+				} else {
+					temp = _documents.get(word);
+
+						temp.add(did);
+					} 
+				_documents.put(word, temp);
+			}
+		
+		
+			if(did>part*200){
+				saveToFile(part);
+				part++;
+				_documents.clear();
+			}
+			did++;
+		}
+		saveToFile(part);
+	}
+
+	public void saveToFile(int part) {
+		String newline = System.getProperty("line.separator");
+		char letter = 'a';
+		String out = " ";
+		TreeMap<String, Vector<Integer>> tm = new TreeMap<String, Vector<Integer>>(
+				_documents);
+		File f = new File("data/index/doc");
+		if (!f.exists()) {
+			f.mkdir();
+		}
 		try {
-			BufferedReader reader = new BufferedReader(new FileReader(index_source));
-			try {
-				String line = null;
-				String[] word = null;
-				Vector<Integer> id = new Vector<Integer>();
-				int did = 0;
-				String stemmed = "";
-				while ((line = reader.readLine()) != null) {
-					// each document is a single line
-					DocumentIndexed d = new DocumentIndexed(did);
-					_allDocs.add(d);
-       
-					word = line.split("[ .,?!]+");
-					for (int i = 0; i < word.length; i++) {
-						/*
-						 * CHECK THIS LOGIC FOR NON-WORDS SUCH AS COMMAS AND ETC
-						 */
-						
-						// If the hashmap has the word as a key, check to see if the did exists in the vector
-						// resets the vector for each word as well as cases where the word is first entered as a key
-						id.clear();
-						stemmed = stem(word[i]);
-						if(!word[i].startsWith("<")) {
-						if(_documents.containsKey(word[i]))
-						{
-						_terms.put(word[i],_terms.get(word[i])+1);
-						id = _documents.get(word[i]);
-						if (!id.contains(did)) {
-							id.add(did);
-						}
-						_documents.put(word[i], id);
-						}
-						else {
-							// otherwise, add the did to the vector for the _documennts as well as the _terms
-							id.add(did);
-							_documents.put(word[i],id);
-							_terms.put(word[i], 1);
-						}
-					}
-					did++;
-					}
+
+			BufferedWriter os = new BufferedWriter(new FileWriter("data/index/doc"
+					+ letter + ".idx.part" + part));
+
+			if (tm.firstKey().startsWith("")) {
+				tm.remove(tm.firstKey());
+			} else {
+				letter = tm.firstKey().charAt(0);
+			}
+
+			for (Entry<String, Vector<Integer>> entry : tm.entrySet()) {
+				String key = entry.getKey();
+				if (key.charAt(0) == letter) {
+					out = entry.getKey() + "\t" + entry.getValue().toString();
+					os.write(out);
+					os.write(newline);
+				} else {
+					os.close();
+					letter = key.charAt(0);
+					os = new BufferedWriter(new FileWriter("data/index/doc"
+							+ letter + ".idx.part" + part));
+					out = entry.getKey() + "\t" + entry.getValue().toString();
+					os.write(out);
+					os.write(newline);
 				}
-			} finally {
-				reader.close();
+			}
+			os.close();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		// maybe we don't have to clear this
+		 _allDocs = new Vector<DocumentIndexed>();
+		_documents = new HashMap<String, Vector<Integer>>();
+	}
+
+	public void loadFromFile(char c) {
+		final String charName = String.valueOf(c).toLowerCase();
+		if (_documents == null) {
+			_documents = new HashMap<String, Vector<Integer>>();
+		}
+		String line = "";
+		String[] map = { "" };
+		String[] freqMap = { "" };
+		Vector<Integer> temp;
+		File file = new File("data/index/occurrences");
+
+		// Filters files by name
+		FilenameFilter textFilter = new FilenameFilter() {
+			public boolean accept(File dir, String name) {
+				if (name.startsWith(charName) && (name.contains(".idx"))) {
+					return true;
+				} else {
+					return false;
+				}
+			}
+		};
+		// Sorts the files because listFiles returns the results backwards
+		File[] sortedFiles = file.listFiles(textFilter);
+		Arrays.sort(sortedFiles);
+		try {
+			// For all files of the name <code c>, enter in the information into
+			// the hashmap
+			for (File entry : sortedFiles) {
+				BufferedReader reader = new BufferedReader(new FileReader(
+						entry.getAbsoluteFile()));
+				while ((line = reader.readLine()) != null) {
+					map = line.split("\t");
+					if (_documents.get(map[0]) != null) {
+						temp = _documents.get(map[0]);
+					} else {
+						temp = new Vector<Integer>();
+					}
+					freqMap = map[1].substring(1, map[1].length() - 1).split(
+							", ");
+					for (int i = 0; i < freqMap.length; i++) {
+						temp.add(Integer.parseInt(freqMap[i]));
+					}
+					_documents.put(map[0], temp);
+				}
 			}
 		} catch (IOException ioe) {
 			System.err.println("Oops " + ioe.getMessage());
 		}
-		System.out.println("Done indexing " + Integer.toString(_documents.size())
-				+ " documents...");
+
 	}
 
 	@Override
@@ -190,4 +295,55 @@ public class IndexerInvertedDoconly extends Indexer {
 		SearchEngine.Check(false, "Not implemented!");
 		return 0;
 	}
+	public static String readToString(String fileName) {  
+    File file = new File(fileName);  
+    Long filelength = file.length();  
+    byte[] filecontent = new byte[filelength.intValue()];  
+    try {  
+        FileInputStream in = new FileInputStream(file);  
+        in.read(filecontent);  
+        in.close();  
+    } catch (FileNotFoundException e) {  
+        e.printStackTrace();  
+    } catch (IOException e) {  
+        e.printStackTrace();  
+    }   
+        return new String(filecontent);  
+}  
+
+public static String Html2Text(String inputString) { 
+    String htmlStr = inputString; 
+        String textStr =""; 
+  java.util.regex.Pattern p_script; 
+  java.util.regex.Matcher m_script; 
+  java.util.regex.Pattern p_style; 
+  java.util.regex.Matcher m_style; 
+  java.util.regex.Pattern p_html; 
+  java.util.regex.Matcher m_html; 
+
+  try { 
+   String regEx_script = "<[\\s]*?script[^>]*?>[\\s\\S]*?<[\\s]*?\\/[\\s]*?script[\\s]*?>"; 
+   String regEx_style = "<[\\s]*?style[^>]*?>[\\s\\S]*?<[\\s]*?\\/[\\s]*?style[\\s]*?>"; 
+      String regEx_html = "<[^>]+>"; 
+  
+      p_script = Pattern.compile(regEx_script,Pattern.CASE_INSENSITIVE); 
+      m_script = p_script.matcher(htmlStr); 
+      htmlStr = m_script.replaceAll(""); 
+
+      p_style = Pattern.compile(regEx_style,Pattern.CASE_INSENSITIVE); 
+      m_style = p_style.matcher(htmlStr); 
+      htmlStr = m_style.replaceAll(""); 
+  
+      p_html = Pattern.compile(regEx_html,Pattern.CASE_INSENSITIVE); 
+      m_html = p_html.matcher(htmlStr); 
+      htmlStr = m_html.replaceAll(""); 
+  
+   textStr = htmlStr; 
+  
+  }catch(Exception e) { 
+           System.err.println("Html2Text: " + e.getMessage()); 
+  } 
+
+  return textStr;
+  }   
 }

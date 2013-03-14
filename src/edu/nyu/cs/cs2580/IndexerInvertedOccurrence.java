@@ -3,6 +3,7 @@ package edu.nyu.cs.cs2580;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -10,9 +11,11 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Scanner;
 import java.util.TreeMap;
 import java.util.Vector;
 import java.util.Map.Entry;
+import java.util.regex.Pattern;
 
 import edu.nyu.cs.cs2580.SearchEngine.Options;
 
@@ -74,11 +77,18 @@ public class IndexerInvertedOccurrence extends Indexer {
 
 	@Override
 	public void constructIndex() throws IOException {
+		String corpusFile = _options._corpusPrefix;
+		//String corpusFile="data/wiki";
+	    System.out.println("Construct index from: " + corpusFile);
+	    
+	    File root = new File(corpusFile);
+        File[] files = root.listFiles();
+        
 		_freqOffset = new HashMap<String, Vector<Integer>>();
 		_allDocs = new Vector<DocumentIndexed>();
-		index_source = "data/simple/test.txt";
+		//index_source = "data/simple/test.txt";
 		String line = null;
-		String[] word = null;
+		//String[] word = null;
 		String[] splitDoc = null;
 		Vector<Integer> temp;
 
@@ -87,87 +97,78 @@ public class IndexerInvertedOccurrence extends Indexer {
 		int didIndex = 0;
 		int freq = 0;
 		int freqIndex = 0;
-
+		int corpusFreq = 0;
 		int partStart = 0;
 		int part = 1;
-		boolean code = false;
-		try {
-			BufferedReader reader = new BufferedReader(new FileReader(
-					index_source));
-			try {
+		for (int i = 0; i < files.length; i++) {
+			termOffset = 0;
+			String filename=corpusFile + "/"+files[i].getName();
+			System.out.println("reading "+filename);
+			DocumentIndexed d = new DocumentIndexed(did);
+			_allDocs.add(d);
+			int pos=0;
+			String content=readToString(filename);
+			content=Html2Text(content);
+			Scanner s=new Scanner(content);
+			while(s.hasNext()){
+				String word=s.next();
+				word=stem(word.toLowerCase());
+				temp = new Vector<Integer>();
+				if (!_freqOffset.containsKey(word)) {
+					temp.add(did);
+					temp.add(1);
+					temp.add(termOffset);
+				} else {
 
-				while ((line = reader.readLine()) != null) {
-					// each document is in it's own line
-					DocumentIndexed d = new DocumentIndexed(did);
-					_allDocs.add(d);
-					// splitDoc = line.split("\t");
-					// word = splitDoc[1].split("[ .,?!]+");
-					// For my own test file
-					word = line.split("[ .,?!]+");
-					for (int i = 0; i < word.length; i++) {
-						// Gets the location of the current word in the document
-						word[i] = stem(word[i].toLowerCase());
-						// creates a new temporary vector for every new word
-						temp = new Vector<Integer>();
-						if (!word[i].startsWith("<") && code == false) {
-							// Very first instance where the word is entered
-							// into the map
-							if (!_freqOffset.containsKey(word[i])) {
-								temp.add(did);
-								temp.add(1);
-								temp.add(termOffset);
-							} else {
+					temp = _freqOffset.get(word);
 
-								temp = _freqOffset.get(word[i]);
-
-								didIndex = getCurrentDidIndex(did, temp);
-								if (didIndex == -1) {
-									// case where it is the first instance in a
-									// new document after
-									// the initial indexing
-									temp.add(did);
-									temp.add(1);
-									temp.add(termOffset);
-								} else {
-									// Updates the frequency and adds the offset
-									freqIndex = didIndex + 1;
-									freq = temp.get(freqIndex);
-									freq++;
-									temp.set(freqIndex, freq);
-									temp.add(termOffset);
-								}
-							}
-							termOffset = i + 1;
-							_freqOffset.put(word[i], temp);
-						} else {
-							// Checks to make sure the word is not non-visible
-							// page content such
-							// as <Script>
-							code = true;
-							if (word[i].endsWith(">")) {
-								code = false;
-							}
-						}
+					didIndex = getCurrentDidIndex(did, temp);
+					if (didIndex == -1) {
+						// case where it is the first instance in a new document after
+						// the initial indexing
+						temp.add(did);
+						temp.add(1);
+						temp.add(termOffset);
+					} else {
+						// Updates the frequency and adds the offset
+						freqIndex = didIndex + 1;
+						freq = temp.get(freqIndex);
+						freq++;
+						temp.set(freqIndex, freq);
+						temp.add(termOffset);
 					}
-					// Somehow need to save the bodysize
-					d.bodySize = termOffset + 1;
-					did++;
-					// Splits off to avoid memory limitations
-					if (did == partStart + 1000) {
-						partStart = did + 1;
-						saveToFile(part);
-						part++;
-					}
-					termOffset = 0;
 				}
-				saveToFile(part);
-
-			} finally {
-				reader.close();
+				termOffset++;
+				_freqOffset.put(word, temp);
 			}
-		} catch (IOException ioe) {
-			System.err.println("Oops " + ioe.getMessage());
+		
+		
+			if(did>part*200){
+				saveToFile(part);
+				part++;
+				_freqOffset.clear();
+			}
+		
+			// Stores the corpus term frequency to file
+			File corpusIndex = new File("data/index/occurrences/frequency");
+			if (!corpusIndex.exists()) {
+				corpusIndex.mkdir();
+			}
+			File corpusTerms = new File("data/index/occurrences/frequency/corpusterms.idx");
+			if(corpusTerms.exists()) {
+				BufferedReader is = new BufferedReader(new FileReader(corpusTerms));
+				corpusFreq = Integer.parseInt(is.readLine());
+				corpusFreq+= termOffset;
+				is.close();
+			} else {
+				corpusFreq = termOffset;
+			}
+			BufferedWriter os = new BufferedWriter(new FileWriter(corpusTerms));
+			os.write(Integer.toString(corpusFreq));
+			os.close();
+			did++;
 		}
+		saveToFile(part);
 	}
 
 	public void saveToFile(int part) {
@@ -176,13 +177,13 @@ public class IndexerInvertedOccurrence extends Indexer {
 		String out = " ";
 		TreeMap<String, Vector<Integer>> tm = new TreeMap<String, Vector<Integer>>(
 				_freqOffset);
-		File f = new File("data/index/");
+		File f = new File("data/index/occurrences");
 		if (!f.exists()) {
 			f.mkdir();
 		}
 		try {
 
-			BufferedWriter os = new BufferedWriter(new FileWriter("data/index/"
+			BufferedWriter os = new BufferedWriter(new FileWriter("data/index/occurrences"
 					+ letter + ".idx.part" + part));
 
 			if (tm.firstKey().startsWith("")) {
@@ -200,7 +201,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 				} else {
 					os.close();
 					letter = key.charAt(0);
-					os = new BufferedWriter(new FileWriter("data/index/"
+					os = new BufferedWriter(new FileWriter("data/index/occurrences"
 							+ letter + ".idx.part" + part));
 					out = entry.getKey() + "\t" + entry.getValue().toString();
 					os.write(out);
@@ -216,7 +217,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 			e.printStackTrace();
 		}
 		// maybe we don't have to clear this
-		// _allDocs = new Vector<DocumentIndexed>();
+		 _allDocs = new Vector<DocumentIndexed>();
 		_freqOffset = new HashMap<String, Vector<Integer>>();
 	}
 
@@ -229,7 +230,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 		String[] map = { "" };
 		String[] freqMap = { "" };
 		Vector<Integer> temp;
-		File file = new File("data/index/");
+		File file = new File("data/index/occurrences");
 
 		// Filters files by name
 		FilenameFilter textFilter = new FilenameFilter() {
@@ -584,4 +585,57 @@ public class IndexerInvertedOccurrence extends Indexer {
 		SearchEngine.Check(false, "Not implemented!");
 		return 0;
 	}
+
+	public static String readToString(String fileName) {  
+        File file = new File(fileName);  
+        Long filelength = file.length();  
+        byte[] filecontent = new byte[filelength.intValue()];  
+        try {  
+            FileInputStream in = new FileInputStream(file);  
+            in.read(filecontent);  
+            in.close();  
+        } catch (FileNotFoundException e) {  
+            e.printStackTrace();  
+        } catch (IOException e) {  
+            e.printStackTrace();  
+        }   
+            return new String(filecontent);  
+    }  
+
+	public static String Html2Text(String inputString) { 
+        String htmlStr = inputString; 
+            String textStr =""; 
+      java.util.regex.Pattern p_script; 
+      java.util.regex.Matcher m_script; 
+      java.util.regex.Pattern p_style; 
+      java.util.regex.Matcher m_style; 
+      java.util.regex.Pattern p_html; 
+      java.util.regex.Matcher m_html; 
+   
+      try { 
+       String regEx_script = "<[\\s]*?script[^>]*?>[\\s\\S]*?<[\\s]*?\\/[\\s]*?script[\\s]*?>"; 
+       String regEx_style = "<[\\s]*?style[^>]*?>[\\s\\S]*?<[\\s]*?\\/[\\s]*?style[\\s]*?>"; 
+          String regEx_html = "<[^>]+>"; 
+      
+          p_script = Pattern.compile(regEx_script,Pattern.CASE_INSENSITIVE); 
+          m_script = p_script.matcher(htmlStr); 
+          htmlStr = m_script.replaceAll(""); 
+
+          p_style = Pattern.compile(regEx_style,Pattern.CASE_INSENSITIVE); 
+          m_style = p_style.matcher(htmlStr); 
+          htmlStr = m_style.replaceAll(""); 
+      
+          p_html = Pattern.compile(regEx_html,Pattern.CASE_INSENSITIVE); 
+          m_html = p_html.matcher(htmlStr); 
+          htmlStr = m_html.replaceAll(""); 
+      
+       textStr = htmlStr; 
+      
+      }catch(Exception e) { 
+               System.err.println("Html2Text: " + e.getMessage()); 
+      } 
+   
+      return textStr;
+      }   
+  
 }
