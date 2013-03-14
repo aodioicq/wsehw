@@ -17,6 +17,8 @@ import java.util.Vector;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
+import com.sun.org.apache.xerces.internal.dom.DocumentImpl;
+
 import edu.nyu.cs.cs2580.SearchEngine.Options;
 
 /**
@@ -24,11 +26,10 @@ import edu.nyu.cs.cs2580.SearchEngine.Options;
  */
 public class IndexerInvertedDoconly extends Indexer {
 
-	private static HashMap<String, Vector<Integer>> _documents;
+	private static HashMap<String, Vector<Integer>> _postingsList;
 	private static HashMap<String, Integer> _terms;
-	 public Vector < DocumentIndexed > _allDocs;
-	 private String index_source;
-
+	public Vector < DocumentIndexed > _allDocs;
+	
 	public IndexerInvertedDoconly(Options options) {
 		super(options);
 		System.out.println("Using Indexer: " + this.getClass().getSimpleName());
@@ -64,27 +65,28 @@ public class IndexerInvertedDoconly extends Indexer {
 		}
 	@Override
 	public void constructIndex() throws IOException {
-		String corpusFile = _options._corpusPrefix;
-		//String corpusFile="data/wiki";
+		//String corpusFile = _options._corpusPrefix;
+		String corpusFile="data/wiki";
 	    System.out.println("Construct index from: " + corpusFile);
 	    
 	    File root = new File(corpusFile);
         File[] files = root.listFiles();
         
-		_documents = new HashMap<String, Vector<Integer>>();
-		_allDocs = new Vector<DocumentIndexed>();
+        String constants=corpusFile+"/constant.idx";
+        BufferedWriter os = new BufferedWriter(new FileWriter(constants,true));
+        
+        _postingsList = new HashMap<String, Vector<Integer>>();
+		//_allDocs = new Vector<DocumentIndexed>();
 		//index_source = "data/simple/test.txt";
-		String line = null;
-	
+        
 		Vector<Integer> temp;
 		int did = 0;
-		int didIndex = 0;
 		int part = 1;
 		for (int i = 0; i < files.length; i++) {
 			String filename=corpusFile + "/"+files[i].getName();
-			System.out.println("reading "+filename);
+			//System.out.println("reading "+filename);
 			DocumentIndexed d = new DocumentIndexed(did);
-			_allDocs.add(d);
+			//_allDocs.add(d);
 			int pos=0;
 			String content=readToString(filename);
 			content=Html2Text(content);
@@ -93,25 +95,29 @@ public class IndexerInvertedDoconly extends Indexer {
 				String word=s.next();
 				word=stem(word.toLowerCase());
 				temp = new Vector<Integer>();
-				if (!_documents.containsKey(word)) {
+				if (!_postingsList.containsKey(word)) {
 					temp.add(did);
 				} else {
-					temp = _documents.get(word);
+					temp = _postingsList.get(word);
 
 						temp.add(did);
 					} 
-				_documents.put(word, temp);
+				_postingsList.put(word, temp);
 			}
 		
+			os.write(did+"\t"+files[i].getName()+"\t"+d.bodySize);
+			os.newLine();
+			os.flush();
 		
 			if(did>part*200){
 				saveToFile(part);
 				part++;
-				_documents.clear();
+				_postingsList.clear();
 			}
 			did++;
 		}
 		saveToFile(part);
+		os.close();
 	}
 
 	public void saveToFile(int part) {
@@ -119,22 +125,30 @@ public class IndexerInvertedDoconly extends Indexer {
 		char letter = 'a';
 		String out = " ";
 		TreeMap<String, Vector<Integer>> tm = new TreeMap<String, Vector<Integer>>(
-				_documents);
-		File f = new File("data/index/doc");
+				_postingsList);
+		//String prefix=_options._indexPrefix+"/doc";
+		String prefix="data/index/doc";
+		File f = new File(prefix);
 		if (!f.exists()) {
 			f.mkdir();
 		}
 		try {
 
-			BufferedWriter os = new BufferedWriter(new FileWriter("data/index/doc"
-					+ letter + ".idx.part" + part));
+			
 
 			if (tm.firstKey().startsWith("")) {
 				tm.remove(tm.firstKey());
-			} else {
-				letter = tm.firstKey().charAt(0);
+			} 
+			char a=tm.firstKey().charAt(0);
+			//System.out.println(a);
+			while(!Character.isLetter(a)){
+				tm.remove(tm.firstKey());	
+				a=tm.firstKey().charAt(0);
 			}
-
+			letter = tm.firstKey().charAt(0);
+			System.out.println(letter);
+			BufferedWriter os = new BufferedWriter(new FileWriter(prefix+"/"
+					+ letter + ".idx.part" + part));
 			for (Entry<String, Vector<Integer>> entry : tm.entrySet()) {
 				String key = entry.getKey();
 				if (key.charAt(0) == letter) {
@@ -142,15 +156,18 @@ public class IndexerInvertedDoconly extends Indexer {
 					os.write(out);
 					os.write(newline);
 				} else {
-					os.close();
+					//os.close();
 					letter = key.charAt(0);
-					os = new BufferedWriter(new FileWriter("data/index/doc"
-							+ letter + ".idx.part" + part));
-					out = entry.getKey() + "\t" + entry.getValue().toString();
-					os.write(out);
-					os.write(newline);
+					if(Character.isLetter(letter)){
+						os = new BufferedWriter(new FileWriter(prefix+"/"
+								+ letter + ".idx.part" + part));
+						out = entry.getKey() + "\t" + entry.getValue().toString();
+						os.write(out);
+						os.write(newline);
+					}
 				}
 			}
+			os.flush();
 			os.close();
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
@@ -160,14 +177,14 @@ public class IndexerInvertedDoconly extends Indexer {
 			e.printStackTrace();
 		}
 		// maybe we don't have to clear this
-		 _allDocs = new Vector<DocumentIndexed>();
-		_documents = new HashMap<String, Vector<Integer>>();
+		 //_allDocs = new Vector<DocumentIndexed>();
+		//_documents = new HashMap<String, Vector<Integer>>();
 	}
 
 	public void loadFromFile(char c) {
 		final String charName = String.valueOf(c).toLowerCase();
-		if (_documents == null) {
-			_documents = new HashMap<String, Vector<Integer>>();
+		if (_postingsList == null) {
+			_postingsList = new HashMap<String, Vector<Integer>>();
 		}
 		String line = "";
 		String[] map = { "" };
@@ -196,8 +213,8 @@ public class IndexerInvertedDoconly extends Indexer {
 						entry.getAbsoluteFile()));
 				while ((line = reader.readLine()) != null) {
 					map = line.split("\t");
-					if (_documents.get(map[0]) != null) {
-						temp = _documents.get(map[0]);
+					if (_postingsList.get(map[0]) != null) {
+						temp = _postingsList.get(map[0]);
 					} else {
 						temp = new Vector<Integer>();
 					}
@@ -206,7 +223,7 @@ public class IndexerInvertedDoconly extends Indexer {
 					for (int i = 0; i < freqMap.length; i++) {
 						temp.add(Integer.parseInt(freqMap[i]));
 					}
-					_documents.put(map[0], temp);
+					_postingsList.put(map[0], temp);
 				}
 			}
 		} catch (IOException ioe) {
@@ -217,6 +234,21 @@ public class IndexerInvertedDoconly extends Indexer {
 
 	@Override
 	public void loadIndex() throws IOException, ClassNotFoundException {
+		String constantFile = _options._indexPrefix + "/constant.idx";
+		BufferedReader reader = new BufferedReader(new FileReader(constantFile));
+	    try {
+	      String line = null;
+	      while ((line = reader.readLine()) != null) {
+	    	  Scanner s = new Scanner(line).useDelimiter("\t");
+	    	  int id=Integer.parseInt(s.next());
+	    	  String url=s.next();
+	    	  DocumentIndexed di=new DocumentIndexed(id);
+	    	  di.setUrl(url);
+	    	  _allDocs.add(di);
+	      }
+	    } finally {
+	      reader.close();
+	    }
 	}
 
 	@Override
@@ -243,7 +275,7 @@ public class IndexerInvertedDoconly extends Indexer {
 		 */
 		for (int i = 0; i < word.size(); i++)
 		{
-			did.add(_documents.get(word.get(i)));
+			did.add(_postingsList.get(word.get(i)));
 		}
 		
 		/*
@@ -281,7 +313,7 @@ public class IndexerInvertedDoconly extends Indexer {
 	@Override
 	public int corpusDocFrequencyByTerm(String term) {
 // returns the size of the vector which contains the number of documents that contain the term
-		return _documents.get(term).size();
+		return _postingsList.get(term).size();
 	}
 
 	@Override
