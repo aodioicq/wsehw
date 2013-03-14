@@ -173,7 +173,7 @@ public class IndexerInvertedDoconly extends Indexer {
 		String[] map = { "" };
 		String[] freqMap = { "" };
 		Vector<Integer> temp;
-		File file = new File("data/index/occurrences");
+		File file = new File("data/index/doc");
 
 		// Filters files by name
 		FilenameFilter textFilter = new FilenameFilter() {
