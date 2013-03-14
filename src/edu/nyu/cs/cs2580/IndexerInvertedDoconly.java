@@ -233,7 +233,7 @@ public class IndexerInvertedDoconly extends Indexer {
 
 	@Override
 	public void loadIndex() throws IOException, ClassNotFoundException {
-		String constantFile = _options._indexPrefix + "/constant.idx";
+		String constantFile = _options._indexPrefix + "/doc/constant.idx";
 		BufferedReader reader = new BufferedReader(new FileReader(constantFile));
 	    try {
 	      String line = null;
