@@ -424,7 +424,7 @@ public class IndexerInvertedCompressed extends Indexer {
 
 	@Override
 	public void loadIndex() throws IOException, ClassNotFoundException {
-		String constantFile = _options._indexPrefix + "/occurance/constant.idx";
+		String constantFile = _options._indexPrefix + "/compressed/constant.idx";
 		BufferedReader reader = new BufferedReader(new FileReader(constantFile));
 	    try {
 	      String line = null;
