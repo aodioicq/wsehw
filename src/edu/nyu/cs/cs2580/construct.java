@@ -25,7 +25,6 @@ public class construct {
 
 	private static HashMap<String, Vector<Integer>> _freqOffset;
 	public static Vector<DocumentIndexed> _allDocs;
-	private static String index_source;
 
 	/**
 	 * @param args
@@ -52,11 +51,12 @@ public class construct {
 		//System.out.println(getPhraseVector(s));
 
 	}
-	public static void constructIndex(Options _options) {
-		String corpusFile = _options._corpusPrefix;
-		//String corpusFile="data/wiki";
+	public static void constructIndex() throws IOException {
+		//String corpusFile = prefix;
+		String corpusFile="data/wiki";
 	    System.out.println("Construct index from: " + corpusFile);
-	    
+	    String constants=corpusFile+"/constant.idx";
+		BufferedWriter os = new BufferedWriter(new FileWriter(constants,true));
 	    File root = new File(corpusFile);
         File[] files = root.listFiles();
         
@@ -76,7 +76,7 @@ public class construct {
 		
 		int partStart = 0;
 		int part = 1;
-		for (int i = 0; i < files.length; i++) {
+		for (int i = 2000; i <3150 /*files.length*/; i++) {
 			termOffset = 0;
 			String filename=corpusFile + "/"+files[i].getName();
 			System.out.println("reading "+filename);
@@ -126,6 +126,9 @@ public class construct {
 				save(part);
 				part++;
 			}*/
+			os.write(did+"\t"+files[i].getName()+"\t"+d.bodySize);
+			os.newLine();
+			os.flush();
 			if(did>part*200){
 				save(part);
 				part++;
@@ -134,6 +137,7 @@ public class construct {
 			did++;
 		}
 		save(part);
+		os.close();
 	}
 	public static void save(int part) {
 		String newline = System.getProperty("line.separator");
@@ -141,7 +145,7 @@ public class construct {
 		String out = " ";
 		TreeMap<String, Vector<Integer>> tm = new TreeMap<String, Vector<Integer>>(
 				_freqOffset);
-		File f = new File("data/index/");
+		File f = new File("data/index");
 		if(!f.exists()) {
 			f.mkdir();
 		}
@@ -156,7 +160,7 @@ public class construct {
 			} else {
 			letter = tm.firstKey().charAt(0);
 			}
-			String ff="data/index/"+letter + ".idx.part" + part;
+			String ff="data/index"+"/"+letter + ".idx.part" + part;
 			System.out.println(ff);
 			BufferedWriter os = new BufferedWriter(new FileWriter(ff));
 			for (Entry<String, Vector<Integer>> entry : tm.entrySet()) {
@@ -174,6 +178,7 @@ public class construct {
 					os.write(newline);
 				}
 			}
+			os.flush();
 			os.close();
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
