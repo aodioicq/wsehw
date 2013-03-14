@@ -72,8 +72,8 @@ public class IndexerInvertedDoconly extends Indexer {
 	    File root = new File(corpusFile);
         File[] files = root.listFiles();
         
-        String constants=corpusFile+"/constant.idx";
-        BufferedWriter os = new BufferedWriter(new FileWriter(constants,true));
+        String constants=_options._indexPrefix+"/doc/constant.idx";
+        BufferedWriter bw = new BufferedWriter(new FileWriter(constants,true));
         
         _postingsList = new HashMap<String, Vector<Integer>>();
 		//_allDocs = new Vector<DocumentIndexed>();
@@ -85,7 +85,7 @@ public class IndexerInvertedDoconly extends Indexer {
 		for (int i = 0; i < files.length; i++) {
 			String filename=corpusFile + "/"+files[i].getName();
 			//System.out.println("reading "+filename);
-			DocumentIndexed d = new DocumentIndexed(did);
+			//DocumentIndexed d = new DocumentIndexed(did);
 			//_allDocs.add(d);
 			int pos=0;
 			String content=readToString(filename);
@@ -99,15 +99,16 @@ public class IndexerInvertedDoconly extends Indexer {
 					temp.add(did);
 				} else {
 					temp = _postingsList.get(word);
-
+					if(!temp.contains(did)){
 						temp.add(did);
-					} 
+					}
+				} 
 				_postingsList.put(word, temp);
 			}
 		
-			os.write(did+"\t"+files[i].getName()+"\t"+d.bodySize);
-			os.newLine();
-			os.flush();
+			bw.write(did+"\t"+files[i].getName()+"\t"+0);
+			bw.newLine();
+			bw.flush();
 		
 			if(did>part*200){
 				saveToFile(part);
@@ -117,7 +118,7 @@ public class IndexerInvertedDoconly extends Indexer {
 			did++;
 		}
 		saveToFile(part);
-		os.close();
+		bw.close();
 	}
 
 	public void saveToFile(int part) {
@@ -134,8 +135,6 @@ public class IndexerInvertedDoconly extends Indexer {
 		}
 		try {
 
-			
-
 			if (tm.firstKey().startsWith("")) {
 				tm.remove(tm.firstKey());
 			} 
@@ -146,7 +145,7 @@ public class IndexerInvertedDoconly extends Indexer {
 				a=tm.firstKey().charAt(0);
 			}
 			letter = tm.firstKey().charAt(0);
-			System.out.println(letter);
+			//System.out.println(letter);
 			BufferedWriter os = new BufferedWriter(new FileWriter(prefix+"/"
 					+ letter + ".idx.part" + part));
 			for (Entry<String, Vector<Integer>> entry : tm.entrySet()) {

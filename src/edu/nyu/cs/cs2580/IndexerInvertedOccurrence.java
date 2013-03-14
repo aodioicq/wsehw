@@ -26,7 +26,6 @@ public class IndexerInvertedOccurrence extends Indexer {
 
 	private HashMap<String, Vector<Integer>> _freqOffset;
 	public Vector<DocumentIndexed> _allDocs;
-	private String index_source;
 	private int numDoc;
 
 	public IndexerInvertedOccurrence(Options options) {
@@ -84,12 +83,11 @@ public class IndexerInvertedOccurrence extends Indexer {
 	    File root = new File(corpusFile);
         File[] files = root.listFiles();
         
+        String constants=_options._indexPrefix+"/occurrences/constant.idx";
+        BufferedWriter bw = new BufferedWriter(new FileWriter(constants,true));
+        
 		_freqOffset = new HashMap<String, Vector<Integer>>();
 		_allDocs = new Vector<DocumentIndexed>();
-		//index_source = "data/simple/test.txt";
-		String line = null;
-		//String[] word = null;
-		String[] splitDoc = null;
 		Vector<Integer> temp;
 
 		int termOffset = 0;
@@ -104,8 +102,8 @@ public class IndexerInvertedOccurrence extends Indexer {
 			termOffset = 0;
 			String filename=corpusFile + "/"+files[i].getName();
 			System.out.println("reading "+filename);
-			DocumentIndexed d = new DocumentIndexed(did);
-			_allDocs.add(d);
+			//DocumentIndexed d = new DocumentIndexed(did);
+			//_allDocs.add(d);
 			int pos=0;
 			String content=readToString(filename);
 			content=Html2Text(content);
@@ -141,34 +139,31 @@ public class IndexerInvertedOccurrence extends Indexer {
 				termOffset++;
 				_freqOffset.put(word, temp);
 			}
-		
+			int bodysize=termOffset+1;
+			bw.write(did+"\t"+files[i].getName()+"\t"+bodysize);
+			bw.newLine();
+			bw.flush();
 		
 			if(did>part*200){
 				saveToFile(part);
 				part++;
 				_freqOffset.clear();
 			}
-		
-			// Stores the corpus term frequency to file
-			File corpusIndex = new File("data/index/occurrences/frequency");
-			if (!corpusIndex.exists()) {
-				corpusIndex.mkdir();
-			}
-			File corpusTerms = new File("data/index/occurrences/frequency/corpusterms.idx");
-			if(corpusTerms.exists()) {
-				BufferedReader is = new BufferedReader(new FileReader(corpusTerms));
-				corpusFreq = Integer.parseInt(is.readLine());
-				corpusFreq+= termOffset;
-				is.close();
-			} else {
-				corpusFreq = termOffset;
-			}
-			BufferedWriter os = new BufferedWriter(new FileWriter(corpusTerms));
-			os.write(Integer.toString(corpusFreq));
-			os.close();
+			corpusFreq+= bodysize;
+			
+			
 			did++;
 		}
 		saveToFile(part);
+		// Stores the corpus term frequency to file
+		File corpusIndex = new File(_options._indexPrefix+"/occurrences/frequency");
+		if (!corpusIndex.exists()) {
+			corpusIndex.mkdir();
+		}
+		File corpusTerms = new File(_options._indexPrefix+"/occurrences/frequency/corpusterms.idx");
+		BufferedWriter os = new BufferedWriter(new FileWriter(corpusTerms));
+		os.write(Integer.toString(corpusFreq));
+		os.close();
 	}
 
 	public void saveToFile(int part) {
@@ -177,20 +172,27 @@ public class IndexerInvertedOccurrence extends Indexer {
 		String out = " ";
 		TreeMap<String, Vector<Integer>> tm = new TreeMap<String, Vector<Integer>>(
 				_freqOffset);
-		File f = new File("data/index/occurrences");
+		//String prefix=_options._indexPrefix+"/occurrences";
+		String prefix="data/index/occurrences";
+		File f = new File(prefix);
 		if (!f.exists()) {
 			f.mkdir();
 		}
 		try {
 
-			BufferedWriter os = new BufferedWriter(new FileWriter("data/index/occurrences"
-					+ letter + ".idx.part" + part));
-
 			if (tm.firstKey().startsWith("")) {
 				tm.remove(tm.firstKey());
-			} else {
-				letter = tm.firstKey().charAt(0);
+			} 
+			char a=tm.firstKey().charAt(0);
+			//System.out.println(a);
+			while(!Character.isLetter(a)){
+				tm.remove(tm.firstKey());	
+				a=tm.firstKey().charAt(0);
 			}
+			letter = tm.firstKey().charAt(0);
+			//System.out.println(letter);
+			BufferedWriter os = new BufferedWriter(new FileWriter(prefix+"/"
+					+ letter + ".idx.part" + part));
 
 			for (Entry<String, Vector<Integer>> entry : tm.entrySet()) {
 				String key = entry.getKey();
@@ -199,15 +201,17 @@ public class IndexerInvertedOccurrence extends Indexer {
 					os.write(out);
 					os.write(newline);
 				} else {
-					os.close();
 					letter = key.charAt(0);
-					os = new BufferedWriter(new FileWriter("data/index/occurrences"
-							+ letter + ".idx.part" + part));
-					out = entry.getKey() + "\t" + entry.getValue().toString();
-					os.write(out);
-					os.write(newline);
+					if(Character.isLetter(letter)){
+						os = new BufferedWriter(new FileWriter(prefix+"/"
+								+ letter + ".idx.part" + part));
+						out = entry.getKey() + "\t" + entry.getValue().toString();
+						os.write(out);
+						os.write(newline);
+					}
 				}
 			}
+			os.flush();
 			os.close();
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
@@ -217,8 +221,8 @@ public class IndexerInvertedOccurrence extends Indexer {
 			e.printStackTrace();
 		}
 		// maybe we don't have to clear this
-		 _allDocs = new Vector<DocumentIndexed>();
-		_freqOffset = new HashMap<String, Vector<Integer>>();
+		// _allDocs = new Vector<DocumentIndexed>();
+		//_freqOffset = new HashMap<String, Vector<Integer>>();
 	}
 
 	public void loadFromFile(char c) {
@@ -411,6 +415,23 @@ public class IndexerInvertedOccurrence extends Indexer {
 
 	@Override
 	public void loadIndex() throws IOException, ClassNotFoundException {
+		String constantFile = _options._indexPrefix + "/occurance/constant.idx";
+		BufferedReader reader = new BufferedReader(new FileReader(constantFile));
+	    try {
+	      String line = null;
+	      while ((line = reader.readLine()) != null) {
+	    	  Scanner s = new Scanner(line).useDelimiter("\t");
+	    	  int id=Integer.parseInt(s.next());
+	    	  String url=s.next();
+	    	  int bodySize=Integer.parseInt(s.next());
+	    	  DocumentIndexed di=new DocumentIndexed(id);
+	    	  di.setUrl(url);
+	    	  di.bodySize=bodySize;
+	    	  _allDocs.add(di);
+	      }
+	    } finally {
+	      reader.close();
+	    }
 	}
 
 	@Override
