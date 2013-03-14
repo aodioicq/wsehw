@@ -146,10 +146,7 @@ public class construct {
 			f.mkdir();
 		}
 		try {
-			
-			
-			//BufferedWriter os = new BufferedWriter(new FileWriter(ff));
-		
+
 			if(tm.firstKey().startsWith(""))
 			{
 				tm.remove(tm.firstKey());
