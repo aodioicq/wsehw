@@ -88,7 +88,7 @@ public class IndexerInvertedCompressed extends Indexer {
 		int didIndex = 0;
 		int freq = 0;
 		int freqIndex = 0;
-
+		int corpusFreq = 0;
 		int partStart = 0;
 		int part = 1;
 		boolean code = false;
@@ -152,8 +152,24 @@ public class IndexerInvertedCompressed extends Indexer {
 							}
 						}
 					}
-					// Somehow need to save the bodysize
-					d.bodySize = termOffset + 1;
+				// Stores the corpus term frequency to file
+					File corpusIndex = new File("data/index/compressed/frequency");
+					if (!corpusIndex.exists()) {
+						corpusIndex.mkdir();
+					}
+					File corpusTerms = new File("data/index/compressed/frequency/corpusterms.idx");
+					if(corpusTerms.exists()) {
+						BufferedReader is = new BufferedReader(new FileReader(corpusTerms));
+						corpusFreq = Integer.parseInt(is.readLine());
+						corpusFreq+= termOffset;
+						is.close();
+					} else {
+						corpusFreq = termOffset;
+					}
+					BufferedWriter os = new BufferedWriter(new FileWriter(corpusTerms));
+					os.write(Integer.toString(corpusFreq));
+					os.close();
+					did++;
 					did++;
 					// Splits off to avoid memory limitations
 					if (did == partStart + 1000) {
@@ -188,13 +204,13 @@ public class IndexerInvertedCompressed extends Indexer {
 		String out = " ";
 		TreeMap<String, Vector<Integer>> tm = new TreeMap<String, Vector<Integer>>(
 				_freqOffset);
-		File f = new File("data/index/");
+		File f = new File("data/index/compressed");
 		if (!f.exists()) {
 			f.mkdir();
 		}
 		try {
 
-			BufferedWriter os = new BufferedWriter(new FileWriter("data/index/"
+			BufferedWriter os = new BufferedWriter(new FileWriter("data/index/compressed"
 					+ letter + ".idx.part" + part));
 
 			if (tm.firstKey().startsWith("")) {
@@ -213,7 +229,7 @@ public class IndexerInvertedCompressed extends Indexer {
 				} else {
 					os.close();
 					letter = key.charAt(0);
-					os = new BufferedWriter(new FileWriter("data/index/"
+					os = new BufferedWriter(new FileWriter("data/index/compressed"
 							+ letter + ".idx.part" + part));
 					out = entry.getKey() + "\t"
 							+ compressVector(entry.getValue());
@@ -244,7 +260,7 @@ public class IndexerInvertedCompressed extends Indexer {
 		String[] map = { "" };
 		String[] freqMap = { "" };
 		Vector<Integer> temp;
-		File file = new File("data/index/");
+		File file = new File("data/index/compressed");
 
 		// Filters files by name
 		FilenameFilter textFilter = new FilenameFilter() {
