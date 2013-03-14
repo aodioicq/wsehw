@@ -97,7 +97,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 		int didIndex = 0;
 		int freq = 0;
 		int freqIndex = 0;
-		
+		int corpusFreq = 0;
 		int partStart = 0;
 		int part = 1;
 		for (int i = 0; i < files.length; i++) {
@@ -141,18 +141,34 @@ public class IndexerInvertedOccurrence extends Indexer {
 				termOffset++;
 				_freqOffset.put(word, temp);
 			}
-			
-			d.bodySize = termOffset + 1;
+		
 		
 			if(did>part*200){
 				saveToFile(part);
 				part++;
 				_freqOffset.clear();
 			}
+		
+			// Stores the corpus term frequency to file
+			File corpusIndex = new File("data/index/occurrences/frequency");
+			if (!corpusIndex.exists()) {
+				corpusIndex.mkdir();
+			}
+			File corpusTerms = new File("data/index/occurrences/frequency/corpusterms.idx");
+			if(corpusTerms.exists()) {
+				BufferedReader is = new BufferedReader(new FileReader(corpusTerms));
+				corpusFreq = Integer.parseInt(is.readLine());
+				corpusFreq+= termOffset;
+				is.close();
+			} else {
+				corpusFreq = termOffset;
+			}
+			BufferedWriter os = new BufferedWriter(new FileWriter(corpusTerms));
+			os.write(Integer.toString(corpusFreq));
+			os.close();
 			did++;
 		}
 		saveToFile(part);
-	
 	}
 
 	public void saveToFile(int part) {
@@ -161,13 +177,13 @@ public class IndexerInvertedOccurrence extends Indexer {
 		String out = " ";
 		TreeMap<String, Vector<Integer>> tm = new TreeMap<String, Vector<Integer>>(
 				_freqOffset);
-		File f = new File("data/index/");
+		File f = new File("data/index/occurrences");
 		if (!f.exists()) {
 			f.mkdir();
 		}
 		try {
 
-			BufferedWriter os = new BufferedWriter(new FileWriter("data/index/"
+			BufferedWriter os = new BufferedWriter(new FileWriter("data/index/occurrences"
 					+ letter + ".idx.part" + part));
 
 			if (tm.firstKey().startsWith("")) {
@@ -185,7 +201,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 				} else {
 					os.close();
 					letter = key.charAt(0);
-					os = new BufferedWriter(new FileWriter("data/index/"
+					os = new BufferedWriter(new FileWriter("data/index/occurrences"
 							+ letter + ".idx.part" + part));
 					out = entry.getKey() + "\t" + entry.getValue().toString();
 					os.write(out);
@@ -201,7 +217,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 			e.printStackTrace();
 		}
 		// maybe we don't have to clear this
-		// _allDocs = new Vector<DocumentIndexed>();
+		 _allDocs = new Vector<DocumentIndexed>();
 		_freqOffset = new HashMap<String, Vector<Integer>>();
 	}
 
@@ -214,7 +230,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 		String[] map = { "" };
 		String[] freqMap = { "" };
 		Vector<Integer> temp;
-		File file = new File("data/index/");
+		File file = new File("data/index/occurrences");
 
 		// Filters files by name
 		FilenameFilter textFilter = new FilenameFilter() {
