@@ -166,6 +166,7 @@ public class IndexerInvertedOccurrence extends Indexer {
 			BufferedWriter os = new BufferedWriter(new FileWriter(corpusTerms));
 			os.write(Integer.toString(corpusFreq));
 			os.close();
+			d.bodySize = termOffset;
 			did++;
 		}
 		saveToFile(part);
@@ -475,12 +476,30 @@ public class IndexerInvertedOccurrence extends Indexer {
 		int index = 0;
 		int tempIndex = docid;
 		boolean exist = false;
+		String[] removePhrase = {};
+		String [] checkPhrase = {};
 		/*
 		 * This for loop first finds the vector in the hashmap that corresponds to
 		 * the query word and then adds it to did
 		 */
+		
 		for (int i = 0; i < word.size(); i++) {
-			tempDid.add(_freqOffset.get(word.get(i)));
+		
+			// loads from the related files
+				if(word.get(i).contains(" ") == true) {
+					checkPhrase = word.get(i).split(" ");
+						for(int j = 0;j<checkPhrase.length;j++) {
+								loadFromFile(checkPhrase[j].charAt(0));
+							}
+						if(!getPhraseVector(checkPhrase).isEmpty()) {
+						tempDid.add(getPhraseVector(checkPhrase)); 
+						} else {
+							return new DocumentIndexed(Integer.MAX_VALUE);
+						}
+					}else {
+							loadFromFile(word.get(i).charAt(0));
+							tempDid.add(_freqOffset.get(word.get(i)));
+						}
 		}
 		did = getOnlyDid(tempDid);
 		// Assuming only one did vector which would mean only one query word
@@ -526,15 +545,42 @@ public class IndexerInvertedOccurrence extends Indexer {
 
 			for (int i = 0; i < word.size(); i++) {
 				// I believe it is match that is the current document id
+				tempDI.bodySize = getDocumentBodySize(match);
 				tempDI.documentTermFrequency.add(documentTermFrequency(word.get(i),
 						match));
 			}
+			clear();
 			return tempDI;
 		}
+		
+	}
+	public int getDocumentBodySize(int docid) {
+		String posting_list = "INSERT FILE LOCATION";
+		String line = " ";
+		String[] word = {};
+		int bodysize = 0;
+		try {
+			BufferedReader in = new BufferedReader(new FileReader(posting_list));
+			// do we want to store it or just read
+			while((line = in.readLine()) != null) {
+			word = line.split("\t");
+			// url did bodysize 
+				if(Integer.parseInt(word[1]) == docid) {
+					bodysize = Integer.parseInt(word[3]);
+					break;
+				}
+			}
+			
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return bodysize;
 	}
 
 	@Override
 	public int corpusDocFrequencyByTerm(String term) {
+		loadFromFile(term.charAt(0));
 		// creates vector of vector of integers to reuse a helper method
 		Vector<Vector<Integer>> termVector = new Vector<Vector<Integer>>();
 		Vector<Vector<Integer>> temp = new Vector<Vector<Integer>>();
@@ -543,11 +589,14 @@ public class IndexerInvertedOccurrence extends Indexer {
 		termVector.add(_freqOffset.get(term));
 		temp = getOnlyDid(termVector);
 		numDoc = temp.get(0).size();
+
+		clear();
 		return numDoc;
 	}
 
 	@Override
 	public int corpusTermFrequency(String term) {
+		loadFromFile(term.charAt(0));
 		// creates vector of vector of integers to reuse a helper method
 		Vector<Vector<Integer>> termVector = new Vector<Vector<Integer>>();
 		Vector<Vector<Integer>> temp = new Vector<Vector<Integer>>();
@@ -563,7 +612,11 @@ public class IndexerInvertedOccurrence extends Indexer {
 			freqIndex = temp.get(0).get(i) + 1;
 			numTerm += _freqOffset.get(term).indexOf(freqIndex);
 		}
+		clear();
 		return numTerm;
+	}
+	public void clear() {
+		_freqOffset.clear();
 	}
 
 	// Returns the number of instances of the query in the document
