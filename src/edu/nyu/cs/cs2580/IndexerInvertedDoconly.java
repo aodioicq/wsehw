@@ -24,7 +24,7 @@ import edu.nyu.cs.cs2580.SearchEngine.Options;
  */
 public class IndexerInvertedDoconly extends Indexer {
 
-	private static HashMap<String, Vector<Integer>> _documents;
+	private static HashMap<String, Vector<Integer>> _posting;
 	private static HashMap<String, Integer> _terms;
 	public Vector<DocumentIndexed> _allDocs;
 	private String index_source;
@@ -73,7 +73,7 @@ public class IndexerInvertedDoconly extends Indexer {
 		File root = new File(corpusFile);
 		File[] files = root.listFiles();
 
-		_documents = new HashMap<String, Vector<Integer>>();
+		_posting = new HashMap<String, Vector<Integer>>();
 		_allDocs = new Vector<DocumentIndexed>();
 		// index_source = "data/simple/test.txt";
 		String line = null;
@@ -95,20 +95,20 @@ public class IndexerInvertedDoconly extends Indexer {
 				String word = s.next();
 				word = stem(word.toLowerCase());
 				temp = new Vector<Integer>();
-				if (!_documents.containsKey(word)) {
+				if (!_posting.containsKey(word)) {
 					temp.add(did);
 				} else {
-					temp = _documents.get(word);
+					temp = _posting.get(word);
 
 					temp.add(did);
 				}
-				_documents.put(word, temp);
+				_posting.put(word, temp);
 			}
 
 			if (did > part * 200) {
 				saveToFile(part);
 				part++;
-				_documents.clear();
+				_posting.clear();
 			}
 			did++;
 		}
@@ -120,7 +120,7 @@ public class IndexerInvertedDoconly extends Indexer {
 		char letter = 'a';
 		String out = " ";
 		TreeMap<String, Vector<Integer>> tm = new TreeMap<String, Vector<Integer>>(
-				_documents);
+				_posting);
 		File f = new File("data/index/doc");
 		if (!f.exists()) {
 			f.mkdir();
@@ -162,13 +162,13 @@ public class IndexerInvertedDoconly extends Indexer {
 		}
 		// maybe we don't have to clear this
 		_allDocs = new Vector<DocumentIndexed>();
-		_documents = new HashMap<String, Vector<Integer>>();
+		_posting = new HashMap<String, Vector<Integer>>();
 	}
 
 	public void loadFromFile(char c) {
 		final String charName = String.valueOf(c).toLowerCase();
-		if (_documents == null) {
-			_documents = new HashMap<String, Vector<Integer>>();
+		if (_posting == null) {
+			_posting = new HashMap<String, Vector<Integer>>();
 		}
 		String line = "";
 		String[] map = { "" };
@@ -197,8 +197,8 @@ public class IndexerInvertedDoconly extends Indexer {
 						entry.getAbsoluteFile()));
 				while ((line = reader.readLine()) != null) {
 					map = line.split("\t");
-					if (_documents.get(map[0]) != null) {
-						temp = _documents.get(map[0]);
+					if (_posting.get(map[0]) != null) {
+						temp = _posting.get(map[0]);
 					} else {
 						temp = new Vector<Integer>();
 					}
@@ -206,7 +206,7 @@ public class IndexerInvertedDoconly extends Indexer {
 					for (int i = 0; i < freqMap.length; i++) {
 						temp.add(Integer.parseInt(freqMap[i]));
 					}
-					_documents.put(map[0], temp);
+					_posting.put(map[0], temp);
 				}
 			}
 		} catch (IOException ioe) {
@@ -242,7 +242,7 @@ public class IndexerInvertedDoconly extends Indexer {
 		 * the query word and then adds it to did
 		 */
 		for (int i = 0; i < word.size(); i++) {
-			did.add(_documents.get(word.get(i)));
+			did.add(_posting.get(word.get(i)));
 		}
 
 		/*
@@ -277,7 +277,7 @@ public class IndexerInvertedDoconly extends Indexer {
 	public int corpusDocFrequencyByTerm(String term) {
 		// returns the size of the vector which contains the number of documents
 		// that contain the term
-		return _documents.get(term).size();
+		return _posting.get(term).size();
 	}
 
 	@Override
