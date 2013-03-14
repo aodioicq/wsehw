@@ -29,10 +29,11 @@ public class construct {
 	/**
 	 * @param args
 	 * @return
+	 * @throws IOException 
 	 */
 
-	public static void main(String[] args) {
-	//	constructIndex();
+	public static void main(String[] args) throws IOException {
+	constructIndex();
 	//	System.out.println(_freqOffset.get("a"));
 	//	load('c');
 	//	load('w');
@@ -53,7 +54,7 @@ public class construct {
 	}
 	public static void constructIndex() throws IOException {
 		//String corpusFile = prefix;
-		String corpusFile="data/wiki";
+		String corpusFile="data/wiki2";
 	    System.out.println("Construct index from: " + corpusFile);
 	    String constants=corpusFile+"/constant.idx";
 		BufferedWriter os = new BufferedWriter(new FileWriter(constants,true));
@@ -61,7 +62,7 @@ public class construct {
         File[] files = root.listFiles();
         
 		_freqOffset = new HashMap<String, Vector<Integer>>();
-		_allDocs = new Vector<DocumentIndexed>();
+		//_allDocs = new Vector<DocumentIndexed>();
 		//index_source = "data/simple/test.txt";
 		String line = null;
 		//String[] word = null;
@@ -76,12 +77,12 @@ public class construct {
 		
 		int partStart = 0;
 		int part = 1;
-		for (int i = 2000; i <3150 /*files.length*/; i++) {
+		for (int i = 1000; i <2150 /*files.length*/; i++) {
 			termOffset = 0;
 			String filename=corpusFile + "/"+files[i].getName();
-			System.out.println("reading "+filename);
+			//System.out.println("reading "+did+" "+filename);
 			DocumentIndexed d = new DocumentIndexed(did);
-			_allDocs.add(d);
+			//_allDocs.add(d);
 			int pos=0;
 			String content=readToString(filename);
 			content=Html2Text(content);
@@ -130,6 +131,7 @@ public class construct {
 			os.newLine();
 			os.flush();
 			if(did>part*200){
+				
 				save(part);
 				part++;
 				_freqOffset.clear();
@@ -140,11 +142,13 @@ public class construct {
 		os.close();
 	}
 	public static void save(int part) {
+		System.out.println("----------------------------------------------------");
 		String newline = System.getProperty("line.separator");
 		char letter = 'a';
 		String out = " ";
 		TreeMap<String, Vector<Integer>> tm = new TreeMap<String, Vector<Integer>>(
 				_freqOffset);
+		
 		File f = new File("data/index");
 		if(!f.exists()) {
 			f.mkdir();
@@ -154,12 +158,19 @@ public class construct {
 			if(tm.firstKey().startsWith(""))
 			{
 				tm.remove(tm.firstKey());
-			} else {
-			letter = tm.firstKey().charAt(0);
 			}
+			char a=tm.firstKey().charAt(0);
+			//System.out.println(a);
+			while(!Character.isLetter(a)){
+				tm.remove(tm.firstKey());	
+				a=tm.firstKey().charAt(0);
+			}
+			letter = tm.firstKey().charAt(0);
+			System.out.println(letter);
+			
 			String ff="data/index"+"/"+letter + ".idx.part" + part;
 			System.out.println(ff);
-			BufferedWriter os = new BufferedWriter(new FileWriter(ff));
+			BufferedWriter os = new BufferedWriter(new FileWriter(ff,true));
 			for (Entry<String, Vector<Integer>> entry : tm.entrySet()) {
 				String key = entry.getKey();
 				if (key.charAt(0) == letter) {
@@ -167,12 +178,16 @@ public class construct {
 					os.write(out);
 					os.write(newline);
 				} else {
-					os.close();
+					//os.close();
 					letter = key.charAt(0);
-					os = new BufferedWriter(new FileWriter(ff));
-					out = entry.getKey() + "\t" + entry.getValue().toString();
-					os.write(out);
-					os.write(newline);
+					if(Character.isLetter(letter)){
+						ff="data/index/"+letter + ".idx.part" + part;
+						os = new BufferedWriter(new FileWriter(ff,true));
+						System.out.println(ff);
+						out = entry.getKey() + "\t" + entry.getValue().toString();
+						os.write(out);
+						os.write(newline);
+					}
 				}
 			}
 			os.flush();
@@ -184,8 +199,9 @@ public class construct {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		_allDocs = new Vector<DocumentIndexed>();
-		_freqOffset = new HashMap<String,Vector<Integer>>();
+		//_allDocs = new Vector<DocumentIndexed>();
+		//_freqOffset = new HashMap<String,Vector<Integer>>();
+		
 	}
 
 	public static void load(char c) {
