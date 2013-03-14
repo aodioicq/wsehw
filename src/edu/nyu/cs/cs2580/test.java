@@ -7,8 +7,8 @@ public class test {
 	 */
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
-	    Ranker ranker = new Ranker("data/corpus.tsv");
-	    ranker.runquery2("bing");
+	    //Ranker ranker = new Ranker("data/corpus.tsv");
+	    //ranker.runquery2("bing");
 	}
 
 }
