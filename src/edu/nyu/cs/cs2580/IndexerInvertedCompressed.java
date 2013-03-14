@@ -94,8 +94,7 @@ public class IndexerInvertedCompressed extends Indexer {
 		boolean code = false;
 
 		try {
-			BufferedReader reader = new BufferedReader(new FileReader(
-					index_source));
+			BufferedReader reader = new BufferedReader(new FileReader(index_source));
 			try {
 
 				while ((line = reader.readLine()) != null) {
@@ -152,16 +151,17 @@ public class IndexerInvertedCompressed extends Indexer {
 							}
 						}
 					}
-				// Stores the corpus term frequency to file
+					// Stores the corpus term frequency to file
 					File corpusIndex = new File("data/index/compressed/frequency");
 					if (!corpusIndex.exists()) {
 						corpusIndex.mkdir();
 					}
-					File corpusTerms = new File("data/index/compressed/frequency/corpusterms.idx");
-					if(corpusTerms.exists()) {
+					File corpusTerms = new File(
+							"data/index/compressed/frequency/corpusterms.idx");
+					if (corpusTerms.exists()) {
 						BufferedReader is = new BufferedReader(new FileReader(corpusTerms));
 						corpusFreq = Integer.parseInt(is.readLine());
-						corpusFreq+= termOffset;
+						corpusFreq += termOffset;
 						is.close();
 					} else {
 						corpusFreq = termOffset;
@@ -210,8 +210,8 @@ public class IndexerInvertedCompressed extends Indexer {
 		}
 		try {
 
-			BufferedWriter os = new BufferedWriter(new FileWriter("data/index/compressed"
-					+ letter + ".idx.part" + part));
+			BufferedWriter os = new BufferedWriter(new FileWriter(
+					"data/index/compressed" + letter + ".idx.part" + part));
 
 			if (tm.firstKey().startsWith("")) {
 				tm.remove(tm.firstKey());
@@ -222,8 +222,7 @@ public class IndexerInvertedCompressed extends Indexer {
 			for (Entry<String, Vector<Integer>> entry : tm.entrySet()) {
 				String key = entry.getKey();
 				if (key.charAt(0) == letter) {
-					out = entry.getKey() + "\t"
-							+ compressVector(entry.getValue());
+					out = entry.getKey() + "\t" + compressVector(entry.getValue());
 					os.write(out);
 					os.write(newline);
 				} else {
@@ -231,8 +230,7 @@ public class IndexerInvertedCompressed extends Indexer {
 					letter = key.charAt(0);
 					os = new BufferedWriter(new FileWriter("data/index/compressed"
 							+ letter + ".idx.part" + part));
-					out = entry.getKey() + "\t"
-							+ compressVector(entry.getValue());
+					out = entry.getKey() + "\t" + compressVector(entry.getValue());
 					os.write(out);
 					os.write(newline);
 				}
@@ -288,8 +286,7 @@ public class IndexerInvertedCompressed extends Indexer {
 					} else {
 						temp = new Vector<Integer>();
 					}
-					freqMap = map[1].substring(1, map[1].length() - 1).split(
-							", ");
+					freqMap = map[1].substring(1, map[1].length() - 1).split(", ");
 					for (int i = 0; i < freqMap.length; i++) {
 						temp.add(d.de_convert(freqMap[i]));
 					}
@@ -407,8 +404,8 @@ public class IndexerInvertedCompressed extends Indexer {
 	}
 
 	/**
-	 * This method gets the did for the case where the index information is
-	 * reset due to adding a different word.
+	 * This method gets the did for the case where the index information is reset
+	 * due to adding a different word.
 	 * 
 	 * @param did
 	 * @param temp
@@ -492,8 +489,8 @@ public class IndexerInvertedCompressed extends Indexer {
 	 * In HW2, you should be using {@link DocumentIndexed}.
 	 * 
 	 * This nextDoc is similar to IndexerInvertedDoconly's nextDoc with the
-	 * exception of the format of the data. nextDoc formats the vector to
-	 * contain just the did's
+	 * exception of the format of the data. nextDoc formats the vector to contain
+	 * just the did's
 	 */
 	@Override
 	public Document nextDoc(Query query, int docid) {
@@ -507,8 +504,8 @@ public class IndexerInvertedCompressed extends Indexer {
 		int tempIndex = docid;
 		boolean exist = false;
 		/*
-		 * This for loop first finds the vector in the hashmap that corresponds
-		 * to the query word and then adds it to did
+		 * This for loop first finds the vector in the hashmap that corresponds to
+		 * the query word and then adds it to did
 		 */
 		for (int i = 0; i < word.size(); i++) {
 			tempDid.add(_freqOffset.get(word.get(i)));
@@ -557,8 +554,8 @@ public class IndexerInvertedCompressed extends Indexer {
 
 			for (int i = 0; i < word.size(); i++) {
 				// I believe it is match that is the current document id
-				tempDI.documentTermFrequency.add(documentTermFrequency(
-						word.get(i), match));
+				tempDI.documentTermFrequency.add(documentTermFrequency(word.get(i),
+						match));
 			}
 			return tempDI;
 		}
