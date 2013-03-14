@@ -169,7 +169,8 @@ public class IndexerInvertedCompressed extends Indexer {
 					BufferedWriter os = new BufferedWriter(new FileWriter(corpusTerms));
 					os.write(Integer.toString(corpusFreq));
 					os.close();
-					did++;
+
+					d.bodySize = termOffset;
 					did++;
 					// Splits off to avoid memory limitations
 					if (did == partStart + 1000) {

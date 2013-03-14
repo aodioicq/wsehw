@@ -26,7 +26,6 @@ public class IndexerInvertedOccurrence extends Indexer {
 
 	private HashMap<String, Vector<Integer>> _freqOffset;
 	public Vector<DocumentIndexed> _allDocs;
-	private String index_source;
 	private int numDoc;
 
 	public IndexerInvertedOccurrence(Options options) {
@@ -78,18 +77,17 @@ public class IndexerInvertedOccurrence extends Indexer {
 	@Override
 	public void constructIndex() throws IOException {
 		String corpusFile = _options._corpusPrefix;
-		// String corpusFile="data/wiki";
-		System.out.println("Construct index from: " + corpusFile);
-
-		File root = new File(corpusFile);
-		File[] files = root.listFiles();
-
+		//String corpusFile="data/wiki";
+	    System.out.println("Construct index from: " + corpusFile);
+	    
+	    File root = new File(corpusFile);
+        File[] files = root.listFiles();
+        
+        String constants=_options._indexPrefix+"/occurrences/constant.idx";
+        BufferedWriter bw = new BufferedWriter(new FileWriter(constants,true));
+        
 		_freqOffset = new HashMap<String, Vector<Integer>>();
 		_allDocs = new Vector<DocumentIndexed>();
-		// index_source = "data/simple/test.txt";
-		String line = null;
-		// String[] word = null;
-		String[] splitDoc = null;
 		Vector<Integer> temp;
 
 		int termOffset = 0;
@@ -102,17 +100,17 @@ public class IndexerInvertedOccurrence extends Indexer {
 		int part = 1;
 		for (int i = 0; i < files.length; i++) {
 			termOffset = 0;
-			String filename = corpusFile + "/" + files[i].getName();
-			System.out.println("reading " + filename);
-			DocumentIndexed d = new DocumentIndexed(did);
-			_allDocs.add(d);
-			int pos = 0;
-			String content = readToString(filename);
-			content = Html2Text(content);
-			Scanner s = new Scanner(content);
-			while (s.hasNext()) {
-				String word = s.next();
-				word = stem(word.toLowerCase());
+			String filename=corpusFile + "/"+files[i].getName();
+			System.out.println("reading "+filename);
+			//DocumentIndexed d = new DocumentIndexed(did);
+			//_allDocs.add(d);
+			int pos=0;
+			String content=readToString(filename);
+			content=Html2Text(content);
+			Scanner s=new Scanner(content);
+			while(s.hasNext()){
+				String word=s.next();
+				word=stem(word.toLowerCase());
 				temp = new Vector<Integer>();
 				if (!_freqOffset.containsKey(word)) {
 					temp.add(did);
@@ -141,35 +139,31 @@ public class IndexerInvertedOccurrence extends Indexer {
 				termOffset++;
 				_freqOffset.put(word, temp);
 			}
-
-			if (did > part * 200) {
+			int bodysize=termOffset+1;
+			bw.write(did+"\t"+files[i].getName()+"\t"+bodysize);
+			bw.newLine();
+			bw.flush();
+		
+			if(did>part*200){
 				saveToFile(part);
 				part++;
 				_freqOffset.clear();
 			}
-
-			// Stores the corpus term frequency to file
-			File corpusIndex = new File("data/index/occurrences/frequency");
-			if (!corpusIndex.exists()) {
-				corpusIndex.mkdir();
-			}
-			File corpusTerms = new File(
-					"data/index/occurrences/frequency/corpusterms.idx");
-			if (corpusTerms.exists()) {
-				BufferedReader is = new BufferedReader(new FileReader(corpusTerms));
-				corpusFreq = Integer.parseInt(is.readLine());
-				corpusFreq += termOffset;
-				is.close();
-			} else {
-				corpusFreq = termOffset;
-			}
-			BufferedWriter os = new BufferedWriter(new FileWriter(corpusTerms));
-			os.write(Integer.toString(corpusFreq));
-			os.close();
-			d.bodySize = termOffset;
+			corpusFreq+= bodysize;
+			
+			
 			did++;
 		}
 		saveToFile(part);
+		// Stores the corpus term frequency to file
+		File corpusIndex = new File(_options._indexPrefix+"/occurrences/frequency");
+		if (!corpusIndex.exists()) {
+			corpusIndex.mkdir();
+		}
+		File corpusTerms = new File(_options._indexPrefix+"/occurrences/frequency/corpusterms.idx");
+		BufferedWriter os = new BufferedWriter(new FileWriter(corpusTerms));
+		os.write(Integer.toString(corpusFreq));
+		os.close();
 	}
 
 	public void saveToFile(int part) {
@@ -178,20 +172,27 @@ public class IndexerInvertedOccurrence extends Indexer {
 		String out = " ";
 		TreeMap<String, Vector<Integer>> tm = new TreeMap<String, Vector<Integer>>(
 				_freqOffset);
-		File f = new File("data/index/occurrences");
+		//String prefix=_options._indexPrefix+"/occurrences";
+		String prefix="data/index/occurrences";
+		File f = new File(prefix);
 		if (!f.exists()) {
 			f.mkdir();
 		}
 		try {
 
-			BufferedWriter os = new BufferedWriter(new FileWriter(
-					"data/index/occurrences" + letter + ".idx.part" + part));
-
 			if (tm.firstKey().startsWith("")) {
 				tm.remove(tm.firstKey());
-			} else {
-				letter = tm.firstKey().charAt(0);
+			} 
+			char a=tm.firstKey().charAt(0);
+			//System.out.println(a);
+			while(!Character.isLetter(a)){
+				tm.remove(tm.firstKey());	
+				a=tm.firstKey().charAt(0);
 			}
+			letter = tm.firstKey().charAt(0);
+			//System.out.println(letter);
+			BufferedWriter os = new BufferedWriter(new FileWriter(prefix+"/"
+					+ letter + ".idx.part" + part));
 
 			for (Entry<String, Vector<Integer>> entry : tm.entrySet()) {
 				String key = entry.getKey();
@@ -200,15 +201,17 @@ public class IndexerInvertedOccurrence extends Indexer {
 					os.write(out);
 					os.write(newline);
 				} else {
-					os.close();
 					letter = key.charAt(0);
-					os = new BufferedWriter(new FileWriter("data/index/occurrences"
-							+ letter + ".idx.part" + part));
-					out = entry.getKey() + "\t" + entry.getValue().toString();
-					os.write(out);
-					os.write(newline);
+					if(Character.isLetter(letter)){
+						os = new BufferedWriter(new FileWriter(prefix+"/"
+								+ letter + ".idx.part" + part));
+						out = entry.getKey() + "\t" + entry.getValue().toString();
+						os.write(out);
+						os.write(newline);
+					}
 				}
 			}
+			os.flush();
 			os.close();
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
@@ -218,8 +221,8 @@ public class IndexerInvertedOccurrence extends Indexer {
 			e.printStackTrace();
 		}
 		// maybe we don't have to clear this
-		_allDocs = new Vector<DocumentIndexed>();
-		_freqOffset = new HashMap<String, Vector<Integer>>();
+		// _allDocs = new Vector<DocumentIndexed>();
+		//_freqOffset = new HashMap<String, Vector<Integer>>();
 	}
 
 	public void loadFromFile(char c) {
@@ -259,7 +262,8 @@ public class IndexerInvertedOccurrence extends Indexer {
 					} else {
 						temp = new Vector<Integer>();
 					}
-					freqMap = map[1].substring(1, map[1].length() - 1).split(", ");
+					freqMap = map[1].substring(1, map[1].length() - 1).split(
+							", ");
 					for (int i = 0; i < freqMap.length; i++) {
 						temp.add(Integer.parseInt(freqMap[i]));
 					}
@@ -377,8 +381,8 @@ public class IndexerInvertedOccurrence extends Indexer {
 	}
 
 	/**
-	 * This method gets the did for the case where the index information is reset
-	 * due to adding a different word.
+	 * This method gets the did for the case where the index information is
+	 * reset due to adding a different word.
 	 * 
 	 * @param did
 	 * @param temp
@@ -411,6 +415,23 @@ public class IndexerInvertedOccurrence extends Indexer {
 
 	@Override
 	public void loadIndex() throws IOException, ClassNotFoundException {
+		String constantFile = _options._indexPrefix + "/occurance/constant.idx";
+		BufferedReader reader = new BufferedReader(new FileReader(constantFile));
+	    try {
+	      String line = null;
+	      while ((line = reader.readLine()) != null) {
+	    	  Scanner s = new Scanner(line).useDelimiter("\t");
+	    	  int id=Integer.parseInt(s.next());
+	    	  String url=s.next();
+	    	  int bodySize=Integer.parseInt(s.next());
+	    	  DocumentIndexed di=new DocumentIndexed(id);
+	    	  di.setUrl(url);
+	    	  di.bodySize=bodySize;
+	    	  _allDocs.add(di);
+	      }
+	    } finally {
+	      reader.close();
+	    }
 	}
 
 	@Override
@@ -462,8 +483,8 @@ public class IndexerInvertedOccurrence extends Indexer {
 	 * In HW2, you should be using {@link DocumentIndexed}.
 	 * 
 	 * This nextDoc is similar to IndexerInvertedDoconly's nextDoc with the
-	 * exception of the format of the data. nextDoc formats the vector to contain
-	 * just the did's
+	 * exception of the format of the data. nextDoc formats the vector to
+	 * contain just the did's
 	 */
 	@Override
 	public Document nextDoc(Query query, int docid) {
@@ -577,10 +598,13 @@ public class IndexerInvertedOccurrence extends Indexer {
 		}
 		return bodysize;
 	}
+	public void clear() {
+		_freqOffset.clear();
+	}
 
 	@Override
 	public int corpusDocFrequencyByTerm(String term) {
-		loadFromFile(term.charAt(0));
+			loadFromFile(term.charAt(0));
 		// creates vector of vector of integers to reuse a helper method
 		Vector<Vector<Integer>> termVector = new Vector<Vector<Integer>>();
 		Vector<Vector<Integer>> temp = new Vector<Vector<Integer>>();
@@ -589,14 +613,13 @@ public class IndexerInvertedOccurrence extends Indexer {
 		termVector.add(_freqOffset.get(term));
 		temp = getOnlyDid(termVector);
 		numDoc = temp.get(0).size();
-
 		clear();
 		return numDoc;
 	}
 
 	@Override
 	public int corpusTermFrequency(String term) {
-		loadFromFile(term.charAt(0));
+			loadFromFile(term.charAt(0));
 		// creates vector of vector of integers to reuse a helper method
 		Vector<Vector<Integer>> termVector = new Vector<Vector<Integer>>();
 		Vector<Vector<Integer>> temp = new Vector<Vector<Integer>>();
@@ -614,9 +637,6 @@ public class IndexerInvertedOccurrence extends Indexer {
 		}
 		clear();
 		return numTerm;
-	}
-	public void clear() {
-		_freqOffset.clear();
 	}
 
 	// Returns the number of instances of the query in the document
@@ -638,56 +658,56 @@ public class IndexerInvertedOccurrence extends Indexer {
 		return 0;
 	}
 
-	public static String readToString(String fileName) {
-		File file = new File(fileName);
-		Long filelength = file.length();
-		byte[] filecontent = new byte[filelength.intValue()];
-		try {
-			FileInputStream in = new FileInputStream(file);
-			in.read(filecontent);
-			in.close();
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return new String(filecontent);
-	}
+	public static String readToString(String fileName) {  
+        File file = new File(fileName);  
+        Long filelength = file.length();  
+        byte[] filecontent = new byte[filelength.intValue()];  
+        try {  
+            FileInputStream in = new FileInputStream(file);  
+            in.read(filecontent);  
+            in.close();  
+        } catch (FileNotFoundException e) {  
+            e.printStackTrace();  
+        } catch (IOException e) {  
+            e.printStackTrace();  
+        }   
+            return new String(filecontent);  
+    }  
 
-	public static String Html2Text(String inputString) {
-		String htmlStr = inputString;
-		String textStr = "";
-		java.util.regex.Pattern p_script;
-		java.util.regex.Matcher m_script;
-		java.util.regex.Pattern p_style;
-		java.util.regex.Matcher m_style;
-		java.util.regex.Pattern p_html;
-		java.util.regex.Matcher m_html;
+	public static String Html2Text(String inputString) { 
+        String htmlStr = inputString; 
+            String textStr =""; 
+      java.util.regex.Pattern p_script; 
+      java.util.regex.Matcher m_script; 
+      java.util.regex.Pattern p_style; 
+      java.util.regex.Matcher m_style; 
+      java.util.regex.Pattern p_html; 
+      java.util.regex.Matcher m_html; 
+   
+      try { 
+       String regEx_script = "<[\\s]*?script[^>]*?>[\\s\\S]*?<[\\s]*?\\/[\\s]*?script[\\s]*?>"; 
+       String regEx_style = "<[\\s]*?style[^>]*?>[\\s\\S]*?<[\\s]*?\\/[\\s]*?style[\\s]*?>"; 
+          String regEx_html = "<[^>]+>"; 
+      
+          p_script = Pattern.compile(regEx_script,Pattern.CASE_INSENSITIVE); 
+          m_script = p_script.matcher(htmlStr); 
+          htmlStr = m_script.replaceAll(""); 
 
-		try {
-			String regEx_script = "<[\\s]*?script[^>]*?>[\\s\\S]*?<[\\s]*?\\/[\\s]*?script[\\s]*?>";
-			String regEx_style = "<[\\s]*?style[^>]*?>[\\s\\S]*?<[\\s]*?\\/[\\s]*?style[\\s]*?>";
-			String regEx_html = "<[^>]+>";
-
-			p_script = Pattern.compile(regEx_script, Pattern.CASE_INSENSITIVE);
-			m_script = p_script.matcher(htmlStr);
-			htmlStr = m_script.replaceAll("");
-
-			p_style = Pattern.compile(regEx_style, Pattern.CASE_INSENSITIVE);
-			m_style = p_style.matcher(htmlStr);
-			htmlStr = m_style.replaceAll("");
-
-			p_html = Pattern.compile(regEx_html, Pattern.CASE_INSENSITIVE);
-			m_html = p_html.matcher(htmlStr);
-			htmlStr = m_html.replaceAll("");
-
-			textStr = htmlStr;
-
-		} catch (Exception e) {
-			System.err.println("Html2Text: " + e.getMessage());
-		}
-
-		return textStr;
-	}
-
+          p_style = Pattern.compile(regEx_style,Pattern.CASE_INSENSITIVE); 
+          m_style = p_style.matcher(htmlStr); 
+          htmlStr = m_style.replaceAll(""); 
+      
+          p_html = Pattern.compile(regEx_html,Pattern.CASE_INSENSITIVE); 
+          m_html = p_html.matcher(htmlStr); 
+          htmlStr = m_html.replaceAll(""); 
+      
+       textStr = htmlStr; 
+      
+      }catch(Exception e) { 
+               System.err.println("Html2Text: " + e.getMessage()); 
+      } 
+   
+      return textStr;
+      }   
+  
 }
