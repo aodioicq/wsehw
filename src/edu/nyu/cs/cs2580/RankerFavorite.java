@@ -40,15 +40,19 @@ public class RankerFavorite extends Ranker {
 				}
 			}			
 		};
-	  Queue<ScoredDocument> D =  new PriorityQueue<ScoredDocument>(numResults,OrderIsdn);  
+	  Queue<ScoredDocument> D =  new PriorityQueue<ScoredDocument>(numResults,OrderIsdn);
 	  Vector<ScoredDocument> results = new Vector<ScoredDocument>();
 	  DocumentIndexed d=(DocumentIndexed) _indexer.nextDoc(query, -1);
-	  while(d._docid!=Integer.MAX_VALUE){
+	  //System.out.println(d._docid);
+	  while(d!=null){
 		  ScoredDocument s=scoreDocument(query, d);
+		  //System.out.println("score:"+s.getScore());
 		  D.add(s);
 		  d=(DocumentIndexed) _indexer.nextDoc(query, d._docid);
+		  //System.out.println(d._docid);
 	  }
 	  results.addAll(D);
+	  System.out.println("finish ranking");
 	  return results;
   }
   
@@ -61,18 +65,21 @@ public class RankerFavorite extends Ranker {
 	  	double score=0.0;
 	  	for(int i = 0; i<qv.size(); i++){
 	    	String currentTerm = qv.get(i);
-	    	DocumentIndexed d=(DocumentIndexed) _indexer.nextDoc(query, -1);
-	    	double documentLikelihood = di.documentTermFrequency.get(i) / di.bodySize;
-	    	double globalLikelihood = (double)_indexer.corpusTermFrequency(currentTerm) / (double)_indexer._totalTermFrequency;
-
-//	    	System.out.println("INFO: "+d.getLocalTermFrequency(currentTerm) + " "+d.getTotalTerms()+" "+Document.termFrequency(currentTerm) + " "+Document.termFrequency());
-
-	    	score *= Math.log((1-lambda)*documentLikelihood + lambda*globalLikelihood);
+	    	int dtf=di.documentTermFrequency.get(i);
+	    	double documentLikelihood = (double )dtf /(double) di.bodySize;
+	    	//System.out.println("dtf:"+dtf+" body:"+di.bodySize);
+	    	int ctf=_indexer.corpusTermFrequency(currentTerm);
+	    	//System.out.println("ctf:"+ctf+" total:"+_indexer._totalTermFrequency);
+	    	double globalLikelihood = (double)ctf / (double)_indexer._totalTermFrequency;
+	    	//System.out.println("d: "+documentLikelihood+" g: "+globalLikelihood);
+	    	score += Math.log((1-lambda)*documentLikelihood + lambda*globalLikelihood);
 	    }
 
 
 //	    System.out.println(did + " "+score);
-		return new ScoredDocument(di,score);
+		return new ScoredDocument(di,Math.pow(Math.E,score));
+	  	//return new ScoredDocument(di,score);
+		
 	}
   
 

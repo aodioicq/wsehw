@@ -7,662 +7,717 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
-import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Scanner;
-import java.util.TreeMap;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.Vector;
-import java.util.Map.Entry;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 
 import edu.nyu.cs.cs2580.SearchEngine.Options;
 
-/**
- * @CS2580: Implement this class for HW2.
- */
 public class IndexerInvertedOccurrence extends Indexer {
-
-	private HashMap<String, Vector<Integer>> _freqOffset;
-	public Vector<DocumentIndexed> _allDocs;
-	private int numDoc;
-
+	//term,did(positions)
+	private HashMap<String, HashMap<Integer, Vector<Integer>>> _index;
+	private Vector<DocumentIndexed> _documents;
+	
 	public IndexerInvertedOccurrence(Options options) {
 		super(options);
-		numDoc = 0;
 		System.out.println("Using Indexer: " + this.getClass().getSimpleName());
 	}
-
-	private String stem(String word) {
-		if (word.endsWith("s") && word.length() > 1) {
-			if (word.endsWith("sses")) {
-				word = word.substring(0, word.length() - 2);
-			} else if (word.endsWith("ies")) {
-				word = word.substring(0, word.length() - 2);
-			} else {
-				word = word.substring(0, word.length() - 1);
-			}
-		}
-		if (word.endsWith("eed")) {
-
-		}
-		if (word.endsWith("edly") || word.endsWith("ingly")) {
-			word = word.substring(0, word.length() - 2);
-
-		}
-		if (word.endsWith("ed")) {
-			word = word.substring(0, word.length() - 2);
-			if (word.endsWith("at")) {
-				word = word + "e";
-			} else if (word.endsWith("bl")) {
-				word = word + "e";
-			} else if (word.endsWith("iz")) {
-				word = word + "e";
-			}
-		}
-		if (word.endsWith("ing")) {
-			word = word.substring(0, word.length() - 3);
-			if (word.endsWith("at")) {
-				word = word + "e";
-			} else if (word.endsWith("bl")) {
-				word = word + "e";
-			} else if (word.endsWith("iz")) {
-				word = word + "e";
-			}
-		}
-		return word;
+	
+	@Override
+	public Document getDoc(int docid) {
+		return _documents.get(docid);
 	}
 
 	@Override
+	public Document nextDoc(Query query, int docid) {
+		DocumentIndexed doc = new DocumentIndexed(docid);
+		String indexFile = _options._indexPrefix + "/occurrence/index.idx";
+		HashMap<String, Vector<Integer>> termsids = new HashMap<String, Vector<Integer>>(); 
+		HashMap<String, Vector<Integer>> termsfreqs = new HashMap<String, Vector<Integer>>(); 
+		HashMap<String, Vector<Integer>> phrasetermsids = new HashMap<String, Vector<Integer>>(); 
+		HashMap<String, Vector<Integer>> phrasetermsfreqs = new HashMap<String, Vector<Integer>>(); 
+		HashMap<String, Vector<Vector<Integer>>> phrasetermsoccurs = new HashMap<String, Vector<Vector<Integer>>>(); 
+		
+		Set<String> phraseterms=new HashSet<String>();
+		for(String term:query._tokens){
+			if(term.contains(" ")){
+				String[] terms=term.split(" ");
+				phraseterms.addAll(Arrays.asList(terms));
+			}
+		}
+		try {
+			BufferedReader reader = new BufferedReader(new FileReader(indexFile));
+			String line;
+			while ((line = reader.readLine()) != null) {
+				String[] data = line.split("\t");
+				if (query._tokens.contains(data[0])) {
+					String pos = data[1];
+					Vector<Integer> docids = new Vector<Integer>();
+					Vector<Integer> freqs = new Vector<Integer>();
+					for (String s : pos.split("\\|")) {
+						String[] nums=s.split(",");
+						docids.add(Integer.parseInt(nums[0])); 
+						freqs.add(Integer.parseInt(nums[1])); 
+					}
+					termsids.put(data[0], docids); // save term and its docids
+					termsfreqs.put(data[0], freqs);
+				}
+				if(phraseterms.contains(data[0])){
+					String pos = data[1];
+					Vector<Integer> docids = new Vector<Integer>();
+					Vector<Vector<Integer>> occurs = new Vector<Vector<Integer>>();
+					for (String s : pos.split("\\|")) {
+						String[] nums=s.split(",");
+						docids.add(Integer.parseInt(nums[0]));
+						Vector<Integer> os=new Vector<Integer>();
+						for(int x=2;x<nums.length;++x){
+							os.add(Integer.parseInt(nums[x]));
+						}
+						occurs.add(os); 
+					}
+					phrasetermsids.put(data[0], docids);
+					phrasetermsoccurs.put(data[0], occurs);
+				}
+			}// end for read file
+			//check for phrases
+			
+			reader.close();
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		HashMap<String, Vector<Integer>> phrasesids = new HashMap<String, Vector<Integer>>(); 
+		for(String term:query._tokens){
+			if(term.contains(" ")){
+				int i=0;
+				String[] words=term.split(" ");
+				Vector<Integer> docids=phrasetermsids.get(words[i]);
+				Vector<Integer> freqs=new Vector<Integer>();
+				while(i<words.length-1){
+					Vector<Integer> nextdocids=phrasetermsids.get(words[i+1]);
+					Vector<Integer> common=getCommon(docids, nextdocids);
+					Vector<Integer> finalcommon=new Vector<Integer>();
+					for(Integer c:common){
+						int a=docids.indexOf(c);
+						int b=nextdocids.indexOf(c);
+						Vector<Integer> dococcurs=phrasetermsoccurs.get(words[i]).get(a);
+						Vector<Integer> nextdococcurs=phrasetermsoccurs.get(words[i+1]).get(b);
+						int freq=0,fc=-1;
+						for(Integer d:dococcurs){
+							int nextpos=d+1;
+							if(nextdococcurs.contains(nextpos)){
+								fc=c;
+								if(i==words.length-2){
+									freq++;
+								}
+							}
+						}
+						if(fc!=-1){
+							finalcommon.add(c);
+							if(i==words.length-2){
+								freqs.add(freq);
+							}
+						}
+					}
+					docids.clear();
+					docids.addAll(finalcommon);
+					i++;
+				}
+				phrasesids.put(term, docids);
+				phrasetermsfreqs.put(term, freqs);
+			}
+		}
+		
+		Vector<Integer> ids = new Vector<Integer>();
+		int result;
+		int id;
+		for (String term : query._tokens) {
+			if(term.contains(" ")){
+				if (phrasesids.get(term) != null){
+					id = next(term, docid, phrasesids.get(term));
+					if(id!=-1)
+						ids.add(id);
+				}
+			}else{
+				if (termsids.get(term) != null) {
+					id = next(term, docid, termsids.get(term));
+					if(id!=-1)
+						ids.add(id);
+				}
+			}
+		}
+		if (ids.size() != query._tokens.size()) // no doc includes all the terms
+			return null;
+
+		if (ids.size() == 1 || find(ids)) {
+			result = ids.get(0);
+			doc = (DocumentIndexed) getDoc(result);
+			Vector<Integer> freqs = new Vector<Integer>();
+			for (String term : query._tokens) {
+				int index=0;
+				if(term.contains(" ")){
+					index=phrasesids.get(term).indexOf(result);
+					freqs.add(phrasetermsfreqs.get(term).get(index));
+				}else{
+					index=termsids.get(term).indexOf(result);
+					freqs.add(termsfreqs.get(term).get(index));
+				}
+			}
+			doc.setDocumentTermFrequency(freqs);
+			return doc;
+
+		} else {
+			return nextDoc(query, max(ids) - 1);
+		}
+	}
+	
+	private Vector<Integer> getCommon(Vector<Integer> v1, Vector<Integer> v2){
+		int i=0,j=0;
+		Vector<Integer> result=new Vector<Integer>();
+		while(i<v1.size()&&j<v2.size()){
+			int a=v1.get(i);
+			int b=v2.get(j);
+			if(a==b){
+				result.add(a);
+			}else if(a>b){
+				j++;
+			}else{
+				i++;
+			}
+		}
+		return result;
+	}
+
+	private boolean find(Vector<Integer> ids) {
+		int first = ids.get(0);
+		for (int i = 1; i < ids.size(); i++) {
+			if (ids.get(i) != first)
+				return false;
+		}
+		return true;
+	}
+
+	private int max(Vector<Integer> ids) {
+		int max = 0;
+		for (int i = 0; i < ids.size(); i++) {
+			if (ids.get(i) > max)
+				max = ids.get(i);
+		}
+		return max;
+	}
+	
+	@Override
 	public void constructIndex() throws IOException {
-		String corpusFile = _options._corpusPrefix;
-		//String corpusFile="data/wiki";
-	    System.out.println("Construct index from: " + corpusFile);
-	    
-	    File root = new File(corpusFile);
+		HashMap<String, HashMap<Integer, Vector<Integer>>> _index = new HashMap<String, HashMap<Integer, Vector<Integer>>>();
+		this._totalTermFrequency=0;
+		this._numDocs=0;
+		String corpus = _options._corpusPrefix + "/";
+		System.out.println("Construct index from: " + corpus);
+		int count=0;
+		int did=0;
+		SortedSet<String> allterms=new TreeSet<String>();
+		File root = new File(corpus);
         File[] files = root.listFiles();
-        
-        String constants=_options._indexPrefix+"/occurrences/constant.idx";
-        //String constants="data/index/occurrences/constant.idx";
-        BufferedWriter bw = new BufferedWriter(new FileWriter(constants,true));
-        
-		_freqOffset = new HashMap<String, Vector<Integer>>();
-		_allDocs = new Vector<DocumentIndexed>();
-		Vector<Integer> temp;
-
-		int termOffset = 0;
-		int did = 0;
-		int didIndex = 0;
-		int freq = 0;
-		int freqIndex = 0;
-		int corpusFreq = 0;
-		int partStart = 0;
-		int part = 1;
-		for (int i = 0; i < files.length; i++) {
-			termOffset = 0;
-			String filename=corpusFile + "/"+files[i].getName();
-			//System.out.println("reading "+filename);
-			//DocumentIndexed d = new DocumentIndexed(did);
-			//_allDocs.add(d);
-			int pos=0;
-			String content=readToString(filename);
-			content=Html2Text(content);
-			Scanner s=new Scanner(content);
-			while(s.hasNext()){
-				String word=s.next();
-				word=stem(word.toLowerCase());
-				temp = new Vector<Integer>();
-				if (!_freqOffset.containsKey(word)) {
-					temp.add(did);
-					temp.add(1);
-					temp.add(termOffset);
-				} else {
-
-					temp = _freqOffset.get(word);
-
-					didIndex = getCurrentDidIndex(did, temp);
-					if (didIndex == -1) {
-						// case where it is the first instance in a new document after
-						// the initial indexing
-						temp.add(did);
-						temp.add(1);
-						temp.add(termOffset);
-					} else {
-						// Updates the frequency and adds the offset
-						freqIndex = didIndex + 1;
-						freq = temp.get(freqIndex);
-						freq++;
-						temp.set(freqIndex, freq);
-						temp.add(termOffset);
-					}
+        String documents = _options._indexPrefix + "/occurrence/documents.idx";
+		BufferedWriter out2 = new BufferedWriter(new FileWriter(documents));
+        for (int i = 0; i < files.length; i++) {
+        	HashMap<String, Vector<Integer>> positions = new HashMap<String, Vector<Integer>>();
+        	String file=corpus +files[i].getName();
+        	String content=getContent(file);
+        	if(content==null){
+        		continue;
+        	}
+        	//DocumentIndexed doc = new DocumentIndexed(did);
+        	//doc.setUrl(files[i].getName());
+        	//doc.setTitle(files[i].getName());
+        	Scanner s = new Scanner(content); 
+        	int p = 1;
+        	while(s.hasNext()){
+        		String word=s.next();
+        		//System.out.println(word);
+        		if(word==""||word==" "||word.length()==0){
+        			continue;
+        		}
+        		++_totalTermFrequency;
+        		allterms.add(word);
+				if(!positions.containsKey(word)){
+					Vector<Integer> postmp = new Vector<Integer>();
+					positions.put(word, postmp);
 				}
-				termOffset++;
-				_freqOffset.put(word, temp);
-			}
-			int bodysize=termOffset+1;
-			bw.write(did+"\t"+files[i].getName()+"\t"+bodysize);
-			bw.newLine();
-			bw.flush();
-		
-			if(did>part*200){
-				saveToFile(part);
-				part++;
-				_freqOffset.clear();
-			}
-			corpusFreq+= bodysize;
-			
-			
-			did++;
+				Vector<Integer> pos=positions.get(word);
+				pos.add(p);
+				p++;
+        	}
+        	String filePath = _options._indexPrefix + "/occurrence/documents/" + did+".idx";
+        	File docfolder = new File(_options._indexPrefix + "/occurrence/documents");
+    		if (!docfolder.exists()) {
+    			docfolder.mkdir();
+    		}
+			BufferedWriter out3 = new BufferedWriter(new FileWriter(filePath));
+        	for (String term : positions.keySet()) {
+    			if (!_index.containsKey(term)) {
+    				HashMap<Integer, Vector<Integer>> doc_pos = new HashMap<Integer, Vector<Integer>>();
+    				doc_pos.put(did, positions.get(term));
+    				_index.put(term, doc_pos);
+    			} else {
+    				HashMap<Integer, Vector<Integer>> plist = _index.get(term);
+    				plist.put(did, positions.get(term));
+    				_index.put(term, plist);
+    			}
+    			out3.write(term + "\t" + positions.get(term).size());
+				out3.newLine();
+    		}
+			//out3.flush();
+			out3.close();
+        	//doc.bodySize=p-1;
+        	out2.write(did+"\t"+files[i].getName()+"\t"+files[i].getName()+"\t"+(p-1));
+        	out2.newLine();
+        	//out2.flush();
+        	//_documents.add(doc);
+        	did++;
+        	if((i/200)>count||(i==files.length-1)){
+        		String foldername = _options._indexPrefix+"/occurrence";
+        		File tmpfolder = new File(foldername);
+    			if (!tmpfolder.isDirectory()) {
+    				tmpfolder.mkdir();
+    			}
+    			File tmpfile = new File(foldername+"/tmp"+count+".idx");
+    			FileWriter fileWritter = new FileWriter(tmpfile);
+    			BufferedWriter bufferWritter = new BufferedWriter(fileWritter);
+        		SortedSet<String> keys = new TreeSet<String>(_index.keySet());
+        		for (String term : keys) {
+        			bufferWritter.write(term+"\t");
+        			StringBuilder value = new StringBuilder();
+        			SortedSet<Integer> dids = new TreeSet<Integer>(_index.get(term).keySet());
+        			for(Integer d:dids){
+        				value.append(d);
+        				value.append(",").append(_index.get(term).get(d).size());
+    					for (int pos : _index.get(term).get(d)) {
+    						value.append(",").append(pos);
+    					}
+    					value.append("|");
+        			}
+        			bufferWritter.write(value.toString());
+        			bufferWritter.newLine();
+        		}
+        		bufferWritter.close();
+        		_index.clear();
+        		count++;
+        	}
+        }
+        this._numDocs=did;
+        String statistics = _options._indexPrefix + "/occurrence/statistics.idx";
+		BufferedWriter out = new BufferedWriter(new FileWriter(statistics));
+		out.write(""+_numDocs);
+		out.newLine();
+		out.write(""+_totalTermFrequency);
+		out.flush();
+		out.close();
+		//String doc = _options._indexPrefix + "/occurrence/documents.idx";
+		//BufferedWriter out2 = new BufferedWriter(new FileWriter(doc));
+		/*
+		for(DocumentIndexed doci:_documents){
+			out2.write(doci._docid+"\t"+doci.getUrl()+"\t"+doci.getTitle()+"\t"+doci.bodySize);
+			out2.newLine();
 		}
-		saveToFile(part);
-		// Stores the corpus term frequency to file
-		
-		File corpusIndex = new File(_options._indexPrefix+"/occurrences/frequency");
-		if (!corpusIndex.exists()) {
-			corpusIndex.mkdir();
-		}
-		File corpusTerms = new File(_options._indexPrefix+"/occurrences/frequency/corpusterms.idx");
-		BufferedWriter os = new BufferedWriter(new FileWriter(corpusTerms));
-		os.write(Integer.toString(corpusFreq));
-		os.close();
-	}
-
-	public void saveToFile(int part) {
-		String newline = System.getProperty("line.separator");
-		char letter = 'a';
-		String out = " ";
-		TreeMap<String, Vector<Integer>> tm = new TreeMap<String, Vector<Integer>>(
-				_freqOffset);
-		String prefix=_options._indexPrefix+"/occurrences";
-		//String prefix="data/index/occurrences";
-		File f = new File(prefix);
-		if (!f.exists()) {
-			f.mkdir();
-		}
-		try {
-
-			if (tm.firstKey().startsWith("")) {
-				tm.remove(tm.firstKey());
-			} 
-			char a=tm.firstKey().charAt(0);
-			//System.out.println(a);
-			while(!Character.isLetter(a)){
-				tm.remove(tm.firstKey());	
-				a=tm.firstKey().charAt(0);
-			}
-			letter = tm.firstKey().charAt(0);
-			//System.out.println(letter);
-			BufferedWriter os = new BufferedWriter(new FileWriter(prefix+"/"
-					+ letter + ".idx.part" + part));
-
-			for (Entry<String, Vector<Integer>> entry : tm.entrySet()) {
-				String key = entry.getKey();
-				if (key.charAt(0) == letter) {
-					out = entry.getKey() + "\t" + entry.getValue().toString();
-					os.write(out);
-					os.write(newline);
-				} else {
-					letter = key.charAt(0);
-					if(Character.isLetter(letter)){
-						os = new BufferedWriter(new FileWriter(prefix+"/"
-								+ letter + ".idx.part" + part));
-						out = entry.getKey() + "\t" + entry.getValue().toString();
-						os.write(out);
-						os.write(newline);
-					}
-				}
-			}
-			os.flush();
-			os.close();
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		// maybe we don't have to clear this
-		// _allDocs = new Vector<DocumentIndexed>();
-		//_freqOffset = new HashMap<String, Vector<Integer>>();
-	}
-
-	public void loadFromFile(char c) {
-		final String charName = String.valueOf(c).toLowerCase();
-		if (_freqOffset == null) {
-			_freqOffset = new HashMap<String, Vector<Integer>>();
-		}
-		String line = "";
-		String[] map = { "" };
-		String[] freqMap = { "" };
-		Vector<Integer> temp;
-		File file = new File("data/index/occurrences");
-
-		// Filters files by name
-		FilenameFilter textFilter = new FilenameFilter() {
-			public boolean accept(File dir, String name) {
-				if (name.startsWith(charName) && (name.contains(".idx"))) {
-					return true;
-				} else {
-					return false;
-				}
-			}
-		};
-		// Sorts the files because listFiles returns the results backwards
-		File[] sortedFiles = file.listFiles(textFilter);
-		Arrays.sort(sortedFiles);
-		try {
-			// For all files of the name <code c>, enter in the information into
-			// the hashmap
-			for (File entry : sortedFiles) {
-				BufferedReader reader = new BufferedReader(new FileReader(
-						entry.getAbsoluteFile()));
-				while ((line = reader.readLine()) != null) {
-					map = line.split("\t");
-					if (_freqOffset.get(map[0]) != null) {
-						temp = _freqOffset.get(map[0]);
-					} else {
-						temp = new Vector<Integer>();
-					}
-					freqMap = map[1].substring(1, map[1].length() - 1).split(
-							", ");
-					for (int i = 0; i < freqMap.length; i++) {
-						temp.add(Integer.parseInt(freqMap[i]));
-					}
-					_freqOffset.put(map[0], temp);
-				}
-			}
-		} catch (IOException ioe) {
-			System.err.println("Oops " + ioe.getMessage());
-		}
+		out2.flush();*/
+		out2.close();
+		merge(allterms);
 
 	}
-
-	public Vector<Integer> getOffsets(Vector<Integer> did, int docid) {
-		Vector<Integer> temp = new Vector<Integer>();
-		int didIndex = 0;
-		int freqIndex = 0;
-		int freq = 0;
-
-		didIndex = getCurrentDidIndex(docid, did);
-		freqIndex = didIndex + 1;
-		freq = did.get(freqIndex);
-		for (int i = 1; i <= freq; i++) {
-			temp.add(did.get(freqIndex + i));
+	
+	private void merge(SortedSet<String> allterms) throws IOException{
+		String foldername = _options._indexPrefix+"/occurrence";
+		//SortedSet<Integer> ids=new TreeSet<Integer>();
+		HashMap<Integer, String> currentLine=new HashMap<Integer, String>();
+		File root = new File(foldername);
+        File[] files = root.listFiles();
+        BufferedReader[] readers = new BufferedReader[files.length-2];
+        for (int i = 0; i < files.length-3; i++) {
+        	readers[i] = new BufferedReader(new FileReader(foldername+"/tmp"+i+".idx"));
+        }
+        File index = new File(foldername+"/index.idx");
+		if (!index.exists()) {
+			index.createNewFile();
 		}
-		return temp;
-	}
-
-	// Assuming there is only one set of offsets at a time
-	public boolean checkPhrase(Vector<Vector<Integer>> offsets) {
-		Vector<Integer> first = offsets.get(0);
-		// contains is for more than 1 word in the phrase
-		Boolean contains = false;
-
-		for (int i = 0; i < first.size(); i++) {
-			for (int j = 1; j < offsets.size(); j++) {
-				if (offsets.get(j).contains(first.get(i) + j)) {
-					contains = true;
-
-				}
-			}
-			if (contains == true) {
-				return contains;
-			}
+		FileWriter fileWritter = new FileWriter(index);
+		BufferedWriter indexWritter = new BufferedWriter(fileWritter);
+		/*
+		File log = new File(foldername+"/log.txt");
+		if (!log.exists()) {
+			log.createNewFile();
 		}
-		// System.out.println(contains);
-		return contains;
-	}
-
-	public Vector<Integer> getMatches(Vector<Vector<Integer>> didOnly,
-			Vector<Vector<Integer>> didOriginal) {
-		Vector<Integer> temp = new Vector<Integer>();
-		Vector<Integer> phrase = new Vector<Integer>();
-		Vector<Vector<Integer>> offsets;
-		Vector<Integer> phraseVector = new Vector<Integer>();
-		Vector<Vector<Integer>> compareFirst = new Vector<Vector<Integer>>();
-		boolean exist = false;
-		boolean isPhrase = false;
-
-		temp = didOnly.get(0);
-
-		for (int j = 0; j < temp.size(); j++) {
-			for (int k = 1; k < didOnly.size(); k++) {
-				if (didOnly.get(k).contains(temp.get(j))) {
-
-					exist = true;
-				} else {
-					// check next did
-					k = 1;
-					exist = false;
-				}
-			}
-			if (exist == true) {
-				phrase.add(temp.get(j));
-			}
-		}
-		// Gets the offsets of all words in the phrase
-		for (int k = 0; k < phrase.size(); k++) {
-			offsets = new Vector<Vector<Integer>>();
-			for (int i = 0; i < didOriginal.size(); i++) {
-				offsets.add(getOffsets(didOriginal.get(i), phrase.get(k)));
-
-			}
-
-			isPhrase = checkPhrase(offsets);
-
-			if (isPhrase == true) {
-
-				phraseVector.add(phrase.get(k));
-				offsets.remove(0);
-			} else {
-				// resets the offsets
-				offsets.remove(0);
-			}
-		}
-		return phraseVector;
-
-	}
-
-	public Vector<Integer> getPhraseVector(String[] queryPhrase) {
-
-		Vector<Integer> phraseMatch = new Vector<Integer>();
-
-		Vector<Vector<Integer>> didOnly = new Vector<Vector<Integer>>();
-		Vector<Vector<Integer>> didOriginal = new Vector<Vector<Integer>>();
-		// Gets the vector for each word
-		for (int i = 0; i < queryPhrase.length; i++) {
-			didOriginal.add(_freqOffset.get(queryPhrase[i]));
-		}
-
-		didOnly = getOnlyDid(didOriginal);
-
-		phraseMatch = getMatches(didOnly, didOriginal);
-
-		return phraseMatch;
-	}
-
-	/**
-	 * This method gets the did for the case where the index information is
-	 * reset due to adding a different word.
-	 * 
-	 * @param did
-	 * @param temp
-	 * @return
-	 */
-	public Integer getCurrentDidIndex(int did, Vector<Integer> temp) {
-		int tempDid = 0;
-		int didIndex = 0;
-		int freq = 0;
-		int freqIndex = 0;
-
-		while (tempDid != did) {
-
-			tempDid = temp.get(didIndex);
-			freqIndex = didIndex + 1;
-			freq = temp.get(freqIndex);
-
-			if (tempDid != did) {
-				didIndex = freqIndex + freq + 1;
-				freqIndex = didIndex + 1;
-				if (didIndex > temp.size() - 1) {
-					return -1;
-				}
-				freq = temp.get(freqIndex);
-				tempDid = temp.get(didIndex);
-			}
-		}
-		return didIndex;
+		FileWriter lWritter = new FileWriter(log);
+		BufferedWriter logWritter = new BufferedWriter(lWritter);*/
+        Iterator it = allterms.iterator();
+        while(it.hasNext()){
+        	String term=(String)it.next();
+        	indexWritter.write(term+"\t");
+        	//logWritter.write("["+term+"]");
+        	//logWritter.newLine();
+        	for (int i = 0; i < files.length-3; i++) {
+        		//logWritter.write("file: "+i);
+        		//logWritter.newLine();
+        		String line;
+        		boolean stored=false;
+        		if(currentLine.containsKey(i)){
+        			line=currentLine.get(i);
+        			stored=true;
+        			//logWritter.write("get saved line: ("+line+")");
+        			//logWritter.newLine();
+        		}else{
+        			line = readers[i].readLine();
+        			//logWritter.write("read in new line: "+line);
+        			//logWritter.newLine();
+        		}
+        		if(line != null){
+        			String[] l = line.split("\t");
+        			//logWritter.write("term: "+term+" l[0]: "+l[0]);
+        			//logWritter.write(l[0].equals(term)?"  =":"    !=");
+        			//logWritter.newLine();
+        			if(l[0].equals(term)){
+        				indexWritter.write(l[1]);
+        				//logWritter.write("write in index: "+l[1]);
+            			//logWritter.newLine();
+        				if(stored){
+        					currentLine.remove(i);
+        					//logWritter.write("remove saved line");
+        					//logWritter.newLine();
+        				}
+        			}else{
+        				if(!stored){
+        					currentLine.put(i, line);
+        					//logWritter.write("save line: "+line);
+        					//logWritter.newLine();
+        				}
+        			}
+        		}
+        	}
+	        indexWritter.newLine();
+        }
+        for (int i = 0; i < files.length-3; i++) {
+        	readers[i].close();
+        	File file = new File(foldername+"/tmp"+i+".idx");
+        	file.delete(); 
+        }
+        indexWritter.flush();
+        indexWritter.close();
+        //logWritter.flush();
+        //logWritter.close();
 	}
 
 	@Override
 	public void loadIndex() throws IOException, ClassNotFoundException {
-		
-		String constantFile = _options._indexPrefix + "/occurance/constant.idx";
-		BufferedReader reader = new BufferedReader(new FileReader(constantFile));
-	    try {
-	      String line = null;
-	      while ((line = reader.readLine()) != null) {
-	    	  Scanner s = new Scanner(line).useDelimiter("\t");
-	    	  int id=Integer.parseInt(s.next());
-	    	  String url=s.next();
-	    	  int bodySize=Integer.parseInt(s.next());
-	    	  DocumentIndexed di=new DocumentIndexed(id);
-	    	  di.setUrl(url);
-	    	  di.bodySize=bodySize;
-	    	  _allDocs.add(di);
-	      }
-	    } finally {
-	      reader.close();
-	    }
-	}
-
-	@Override
-	public Document getDoc(int docid) {
-		SearchEngine.Check(false, "Do NOT change, not used for this Indexer!");
-		return null;
-	}
-
-	public Integer next(int did, Vector<Integer> temp) {
-		int nextDid = 0;
-		int didIndex = 0;
-		int freq = 0;
-		int freqIndex = 0;
-
-		// Gets the current did index
-		didIndex = getCurrentDidIndex(temp.get(did), temp);
-		freqIndex = didIndex + 1;
-		freq = temp.get(freqIndex);
-		nextDid = freq + freqIndex + 1;
-		if (nextDid >= temp.size() - 1) {
-			return -1;
+		String indexFile = _options._indexPrefix + "/occurrence/statistics.idx";
+		String docFile = _options._indexPrefix + "/occurrence/documents.idx";
+		_documents=new Vector<DocumentIndexed>();
+		System.out.println("Load index from: " + indexFile);
+		BufferedReader reader = new BufferedReader(new FileReader(indexFile));
+		String line = null;
+		if ((line = reader.readLine()) != null)
+			this._numDocs = Integer.parseInt(line);
+		if ((line = reader.readLine()) != null)
+			this._totalTermFrequency = Integer.parseInt(line);
+		reader.close();
+		reader = new BufferedReader(new FileReader(docFile));
+		line = null;
+		while((line = reader.readLine()) != null){
+			String[] l = line.split("\t");
+			DocumentIndexed doc=new DocumentIndexed(Integer.parseInt(l[0]));
+			doc.setTitle(l[1]);
+			doc.setUrl(l[2]);
+			doc.bodySize=Integer.parseInt(l[3]);
+			_documents.add(doc);			
 		}
-		// this should return the index of the next did
-		return nextDid;
-	}
-
-	public Vector<Vector<Integer>> getOnlyDid(Vector<Vector<Integer>> allDid) {
-		Vector<Integer> tempDidVector;
-		int tempDid = 0;
-		Vector<Vector<Integer>> did = new Vector<Vector<Integer>>();
-		// Loops through allDid
-		for (int i = 0; i < allDid.size(); i++) {
-			tempDidVector = new Vector<Integer>();
-			// For each vector, remove all integers that is not a did
-			while (tempDid != -1) {
-				// Adds each did index to the tempDidVector. -1 means that it
-				// reached
-				// the end of the vector.;
-				tempDidVector.add(allDid.get(i).get(tempDid));
-				tempDid = next(tempDid, allDid.get(i));
-			}
-			tempDid = 0;
-			did.add(tempDidVector);
-		}
-		return did;
-	}
-
-	/**
-	 * In HW2, you should be using {@link DocumentIndexed}.
-	 * 
-	 * This nextDoc is similar to IndexerInvertedDoconly's nextDoc with the
-	 * exception of the format of the data. nextDoc formats the vector to
-	 * contain just the did's
-	 */
-	@Override
-	public Document nextDoc(Query query, int docid) {
-		Vector<Vector<Integer>> tempDid = new Vector<Vector<Integer>>();
-		Vector<Vector<Integer>> did = new Vector<Vector<Integer>>();
-		query.processQuery();
-		Vector<String> word = query._tokens;
-		Vector<Integer> temp = new Vector<Integer>();
-		int match = docid;
-		int index = 0;
-		int tempIndex = docid;
-		boolean exist = false;
-		String[] removePhrase = {};
-		String [] checkPhrase = {};
-		/*
-		 * This for loop first finds the vector in the hashmap that corresponds to
-		 * the query word and then adds it to did
-		 */
-		
-		for (int i = 0; i < word.size(); i++) {
-		
-			// loads from the related files
-				if(word.get(i).contains(" ") == true) {
-					checkPhrase = word.get(i).split(" ");
-						for(int j = 0;j<checkPhrase.length;j++) {
-								loadFromFile(checkPhrase[j].charAt(0));
-							}
-						if(!getPhraseVector(checkPhrase).isEmpty()) {
-						tempDid.add(getPhraseVector(checkPhrase)); 
-						} else {
-							return new DocumentIndexed(Integer.MAX_VALUE);
-						}
-					}else {
-							loadFromFile(word.get(i).charAt(0));
-							tempDid.add(_freqOffset.get(word.get(i)));
-						}
-		}
-		did = getOnlyDid(tempDid);
-		// Assuming only one did vector which would mean only one query word
-		if (did.size() > 1) {
-			temp = did.get(0);
-
-			index = temp.indexOf(docid) + 1;
-			for (int i = index; i < temp.size(); i++) {
-				for (int k = 1; k < did.size(); k++) {
-					if (did.get(k).contains(temp.get(index))) {
-						exist = true;
-					} else {
-						// check next did
-						k = 1;
-						exist = false;
-					}
-				}
-				if (exist == true) {
-					match = did.get(0).get(index);
-
-					// terminates the while loop
-					index = temp.size();
-				}
-				index++;
-			}
-		} else {
-			// the case for one query word which results in one did so get the
-			// next did
-			if (did.indexOf(docid) != did.size() - 1) {
-				int curIndex = did.get(0).indexOf(docid);
-				match = did.get(0).get(curIndex + 1);
-
-			}
-		}
-		if (match == docid) {
-			return new DocumentIndexed(Integer.MAX_VALUE);
-		} else {
-			// updates the term frequency in the document
-
-			// Flesh this out. _All docs is cleared after saving so maybe create
-			// a new Document? However, it will not retain any prior information
-			DocumentIndexed tempDI = new DocumentIndexed(match);
-
-			for (int i = 0; i < word.size(); i++) {
-				// I believe it is match that is the current document id
-				tempDI.bodySize = getDocumentBodySize(match);
-				tempDI.documentTermFrequency.add(documentTermFrequency(word.get(i),
-						match));
-			}
-			clear();
-			return tempDI;
-		}
-		
-	}
-	public int getDocumentBodySize(int docid) {
-		String posting_list = "INSERT FILE LOCATION";
-		String line = " ";
-		String[] word = {};
-		int bodysize = 0;
-		try {
-			BufferedReader in = new BufferedReader(new FileReader(posting_list));
-			// do we want to store it or just read
-			while((line = in.readLine()) != null) {
-			word = line.split("\t");
-			// url did bodysize 
-				if(Integer.parseInt(word[1]) == docid) {
-					bodysize = Integer.parseInt(word[3]);
-					break;
-				}
-			}
-			
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		return bodysize;
-	}
-	public void clear() {
-		_freqOffset.clear();
+		reader.close();
 	}
 
 	@Override
 	public int corpusDocFrequencyByTerm(String term) {
-			loadFromFile(term.charAt(0));
-		// creates vector of vector of integers to reuse a helper method
-		Vector<Vector<Integer>> termVector = new Vector<Vector<Integer>>();
-		Vector<Vector<Integer>> temp = new Vector<Vector<Integer>>();
-		int numDoc = 0;
-
-		termVector.add(_freqOffset.get(term));
-		temp = getOnlyDid(termVector);
-		numDoc = temp.get(0).size();
-		clear();
-		return numDoc;
+		String indexFile = _options._indexPrefix + "/index.idx";
+		if(term.contains(" ")){
+			return 0;
+		}else{
+			try {
+				BufferedReader reader = new BufferedReader(new FileReader(indexFile));
+				String line;
+				int termDocFreq = 0;
+				out: while ((line = reader.readLine()) != null) {
+					Scanner s = new Scanner(line).useDelimiter("\t");
+					String t = null,docs = null;
+					while (s.hasNext()) {
+						t = s.next();
+						docs=s.next();
+					}
+					if (t.equals(term)) {
+						String[] data = docs.split("\\|");
+						termDocFreq = data.length;
+						s.close();
+						break out;
+					}
+					s.close();
+				}
+				reader.close();
+				return termDocFreq;
+			}catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return 0;
 	}
 
 	@Override
 	public int corpusTermFrequency(String term) {
-			loadFromFile(term.charAt(0));
-		// creates vector of vector of integers to reuse a helper method
-		Vector<Vector<Integer>> termVector = new Vector<Vector<Integer>>();
-		Vector<Vector<Integer>> temp = new Vector<Vector<Integer>>();
-		int numTerm = 0;
-		int freqIndex = 0;
-		termVector.add(_freqOffset.get(term));
-		// Gets the vector of did
-		temp = getOnlyDid(termVector);
-
-		// adds up the frequency of the term in all documents
-		for (int i = 0; i < temp.get(0).size(); i++) {
-			// gets all freq index using the did + 1
-			freqIndex = temp.get(0).get(i) + 1;
-			numTerm += _freqOffset.get(term).indexOf(freqIndex);
+		String indexFile = _options._indexPrefix + "/occurrence/index.idx";
+		if(term.contains(" ")){
+			try {
+				String[] terms=term.split(" ");
+				ArrayList<String> words=(ArrayList<String>) Arrays.asList(terms);
+				HashMap<String,Vector<Integer>> docids=new HashMap<String,Vector<Integer>>();
+				HashMap<String,Vector<Vector<Integer>>> docfreqs=new HashMap<String,Vector<Vector<Integer>>>();
+				BufferedReader reader = new BufferedReader(new FileReader(indexFile));
+				String line;
+				while ((line = reader.readLine()) != null) {
+					Scanner s = new Scanner(line).useDelimiter("\t");
+					String t = null,docs = null;
+					while (s.hasNext()) {
+						t = s.next();
+						docs=(s.hasNext())?s.next():null;
+					}
+					if (words.contains(t)&&docs!=null) {
+						String[] data = docs.split("\\|");
+						Vector<Integer> ids=new Vector<Integer>();
+						Vector<Vector<Integer>> freqs=new Vector<Vector<Integer>>();
+						for(int i=0;i<data.length;i++){
+							Scanner s2 = new Scanner(data[i]).useDelimiter(",");							
+							int id=s2.nextInt();
+							ids.add(id);
+							Vector<Integer> pos=new Vector<Integer>();
+							while(s2.hasNext()){
+								pos.add(s2.nextInt());
+							}
+							freqs.add(pos);
+							s2.close();
+						}
+						docids.put(t, ids);
+						docfreqs.put(t, freqs);
+						s.close();
+					}
+				}
+				Vector<Integer> common=new Vector<Integer>(docids.get(terms[0]));
+				for(int i=1;i<terms.length;++i){
+					common=getCommon(common, docids.get(terms[i]));
+				}
+				Vector<Integer> finalcommon=new Vector<Integer>();
+				int sum=0;
+				if(common.size()>0){
+					for(Integer id:common){
+						int index=docids.get(terms[0]).indexOf(id);
+						Vector<Integer> pos=docfreqs.get(terms[0]).get(index);
+						for(int i=0;i<terms.length-1;++i){
+							int index2=docids.get(terms[i+1]).indexOf(id);
+							Vector<Integer> pos2=docfreqs.get(terms[i+1]).get(index2);
+							Vector<Integer> newpos=new Vector<Integer>();
+							for(Integer p:pos){
+								if(pos2.contains(p+1)){
+									if(i==terms.length-2){
+										sum++;
+									}
+									newpos.add(p+1);
+								}
+							}	
+							pos=new Vector<Integer>(newpos);
+						}
+					}
+					return sum;
+				}else{
+					return 0;
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}						
+		}else{
+			try {
+				BufferedReader reader = new BufferedReader(new FileReader(indexFile));
+				String line;
+				int corpusTermFreq = 0;
+				out: while ((line = reader.readLine()) != null) {
+					Scanner s = new Scanner(line).useDelimiter("\t");
+					String t = null,docs = null;
+					while (s.hasNext()) {
+						t = s.next();
+						docs=(s.hasNext())?s.next():null;
+					}
+					if (t.equals(term)&&docs!=null) {
+						String[] data = docs.split("\\|");
+						for(int i=0;i<data.length;i++){
+							Scanner s2 = new Scanner(data[i]).useDelimiter(",");
+							s2.next();
+							int o=Integer.parseInt(s2.next());
+							//System.out.println(o);
+							corpusTermFreq+=o;
+							s2.close();
+						}
+						s.close();
+						break out;
+					}
+					
+				}
+				reader.close();
+				return corpusTermFreq;
+			}catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
-		clear();
-		return numTerm;
-	}
-
-	// Returns the number of instances of the query in the document
-	public int documentTermFrequency(String term, int docid) {
-		Vector<Vector<Integer>> termVector = new Vector<Vector<Integer>>();
-		Vector<Vector<Integer>> temp = new Vector<Vector<Integer>>();
-		int didIndex = 0;
-		int freqIndex = 0;
-		termVector.add(_freqOffset.get(term));
-		// Gets the vector of did
-		didIndex = getCurrentDidIndex(docid, termVector.get(0));
-		freqIndex = didIndex + 1;
-		return _freqOffset.get(term).get(freqIndex);
+		return 0;
 	}
 
 	@Override
 	public int documentTermFrequency(String term, String url) {
-		SearchEngine.Check(false, "Not implemented!");
+		String indexFile = _options._indexPrefix + "/index.idx";
+		int docid = 0;
+		for(DocumentIndexed doc:_documents){
+			if(doc.getUrl().equals(url)){
+				docid=doc._docid;
+			}else{
+				return 0;
+			}
+		}
+		if(term.contains(" ")){
+			String[] terms=term.split(" ");
+			ArrayList<String> words=(ArrayList<String>) Arrays.asList(terms);
+			HashMap<String, Vector<Integer>> freqs=new HashMap<String, Vector<Integer>>();
+			BufferedReader reader;
+			try {
+				reader = new BufferedReader(new FileReader(indexFile));
+				String line;
+				while ((line = reader.readLine()) != null) {
+					Scanner s = new Scanner(line).useDelimiter("\t");
+					String t = null,docs = null;
+					while (s.hasNext()) {
+						t = s.next();
+						docs=(s.hasNext())?s.next():null;
+					}
+					int count=0;
+					if (words.contains(t)||docs!=null) {
+						count++;
+						String[] data = docs.split("\\|");
+						for(int i=0;i<data.length;i++){
+							Scanner s2 = new Scanner(data[i]).useDelimiter(",");
+							int did=s2.nextInt();
+							if(did==docid){
+								Vector<Integer> f=new Vector<Integer>();
+								s2.next();
+								while(s2.hasNext()){
+									f.add(s2.nextInt());
+								}
+								freqs.put(t, f);
+								break;
+							}
+							
+						}
+					}
+					if(count==words.size()){
+						break;
+					}
+				}
+				Vector<Integer> pos=freqs.get(terms[0]);
+				int sum=0;
+				for(int i=1;i<terms.length;++i){
+					if(pos.size()==0||pos==null){
+						break;
+					}
+					Vector<Integer> newpos=new Vector<Integer>();
+					Vector<Integer> pos2=freqs.get(terms[i]);
+					for(Integer p:pos){
+						if(pos2.contains(p+1)){
+							sum++;
+							newpos.add(p+1);
+						}
+					}
+					pos=new Vector<Integer>(newpos);
+				}
+				return sum;
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
+		}else{
+			try {
+				BufferedReader reader = new BufferedReader(new FileReader(indexFile));
+				String line;
+				int docTermFreq = 0;
+				out: while ((line = reader.readLine()) != null) {
+					Scanner s = new Scanner(line).useDelimiter("\t");
+					String t = null,docs = null;
+					while (s.hasNext()) {
+						t = s.next();
+						docs=(s.hasNext())?s.next():null;
+					}
+					if (t.equals(term)||docs!=null) {
+						String[] data = docs.split("\\|");
+						for(int i=0;i<data.length;i++){
+							Scanner s2 = new Scanner(data[i]).useDelimiter(",");
+							int did=Integer.parseInt(s2.next());
+							if(did==docid){
+								docTermFreq+=Integer.parseInt(s2.next());
+								s2.close();
+								s.close();
+								break out;
+							}
+							s2.close();
+						}
+					}
+					s.close();
+				}
+				reader.close();
+				return docTermFreq;
+			}catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
 		return 0;
 	}
+	
+	private int next(String word, int docid, Vector<Integer> docids) {
+		if (docids.lastElement() <= docid)
+			return -1;
+		if (docids.firstElement() > docid) {
+			return docids.firstElement();
+		}
+		int high = docids.size() - 1;
+		int result = binarySearch(word, 0, high, docid, docids);
+		return docids.get(result);
+	}
 
-	public static String readToString(String fileName) {  
-        File file = new File(fileName);  
+	private int binarySearch(String word, int low, int high, int docid,Vector<Integer> docIDs) {
+		while (high - low > 1) {
+			int mid = (low + high) >>> 1;
+			if (docIDs.get(mid) <= docid) {
+				low = mid + 1;
+			} else {
+				high = mid;
+			}
+		}
+		return docIDs.get(low) > docid ? low : high;
+	}
+	
+	public static String getContent(String fileName) {  
+        /*
+		File file = new File(fileName);  
         Long filelength = file.length();  
         byte[] filecontent = new byte[filelength.intValue()];  
         try {  
@@ -673,12 +728,30 @@ public class IndexerInvertedOccurrence extends Indexer {
             e.printStackTrace();  
         } catch (IOException e) {  
             e.printStackTrace();  
-        }   
-            return new String(filecontent);  
-    }  
+        }   */
+		StringBuilder content = new StringBuilder();
 
+		try {
+			InputStream is = new FileInputStream(fileName);
+			InputStreamReader isr = new InputStreamReader(is, "utf-8");
+			BufferedReader input = new BufferedReader(isr);
+			try {
+				String line = null; // not declared within while loop
+				while ((line = input.readLine()) != null) {
+					content.append(line);
+					content.append(System.getProperty("line.separator"));
+				}
+			} finally {
+				input.close();
+			}
+		} catch (IOException ex) {
+			ex.printStackTrace();
+		}
+        return Html2Text(content.toString());  
+    }  
 	public static String Html2Text(String inputString) { 
-        String htmlStr = inputString; 
+       /*
+		String htmlStr = inputString; 
             String textStr =""; 
       java.util.regex.Pattern p_script; 
       java.util.regex.Matcher m_script; 
@@ -710,7 +783,54 @@ public class IndexerInvertedOccurrence extends Indexer {
                System.err.println("Html2Text: " + e.getMessage()); 
       } 
    
-      return textStr;
-      }   
-  
+      return textStr;*/
+		StringBuilder builder = new StringBuilder();
+		String bodyPattern = "<body.*>.+</body>";
+		Pattern body = Pattern.compile(bodyPattern, Pattern.CASE_INSENSITIVE | Pattern.DOTALL | Pattern.MULTILINE);
+		Matcher bodyResult = body.matcher(inputString);
+		if(!bodyResult.find()){
+			return null;
+		}
+		String bodyString = bodyResult.group(); //process the body of the html
+		// replace all the non-word characters except ' and - to space
+		String resultBody = bodyString.replaceAll("\\&.*?;"," ");
+		//replace all scripts
+		resultBody = resultBody.replaceAll("<script.*?>[\\d\\D]*?</script>"," ");
+		//replace all labels
+		resultBody = resultBody.replaceAll("</?.*?/?>", " ");
+		resultBody = resultBody.replaceAll("[^\\w]", " ");
+
+		// replace duplicate white spaces to one space
+		resultBody = resultBody.replaceAll("\\s+"," ");
+		if(resultBody.equals("")){
+			return null;
+		}
+		builder.append(resultBody);
+		String output = builder.toString();
+		Stemmer stemmer = new Stemmer();
+		stemmer.add(output);
+		stemmer.stem();
+		return stemmer.toString();
+    }	
+	
+	public static void main(String[] args) throws IOException,
+	ClassNotFoundException {
+		Options option = new Options("conf/engine.conf");
+		IndexerInvertedOccurrence index = new IndexerInvertedOccurrence(option);
+		//index.constructIndex();
+		index.loadIndex();
+		//
+		Query query = new Query("Morrow");
+		query.processQuery();
+		
+		//Document nextdoc = index.nextDoc(query, 346);
+		System.out.println(index.corpusTermFrequency("Morrow"));
+		/*
+		if(nextdoc!=null)
+			System.out.println(nextdoc._docid);
+		else
+			System.out.println("Null");
+		*/
+	}
+
 }

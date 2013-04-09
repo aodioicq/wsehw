@@ -5,686 +5,820 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
-import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Scanner;
-import java.util.TreeMap;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.Vector;
-import java.util.Map.Entry;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 
 import edu.nyu.cs.cs2580.SearchEngine.Options;
 
-/**
- * @CS2580: Implement this class for HW2.
- */
 public class IndexerInvertedCompressed extends Indexer {
-
-	private HashMap<String, Vector<Integer>> _freqOffset;
-	public Vector<DocumentIndexed> _allDocs;
-	private int numDoc;
-
+	private static final int vmax = 128;
+	static final int con = Integer.MAX_VALUE;
+	private String indexFile = _options._indexPrefix + "/compressed/index.idx";
+	//term did positions
+	private Map<Long,Map<Integer,Vector<Integer>>> tmpIndex = new LRUMap<Long,Map<Integer,Vector<Integer>>>(1000,1000);
+	private HashMap<String,Integer> CTFCache=new HashMap<String,Integer>();
+	//term did(positions in bytes)
+	private HashMap<String, Vector<Vector<Byte>>> _index;
+	private Vector<DocumentIndexed> _documents;
+	
 	public IndexerInvertedCompressed(Options options) {
 		super(options);
-		numDoc = 0;
 		System.out.println("Using Indexer: " + this.getClass().getSimpleName());
 	}
-
-	private String stem(String word) {
-		if (word.endsWith("s") && word.length() > 1) {
-			if (word.endsWith("sses")) {
-				word = word.substring(0, word.length() - 2);
-			} else if (word.endsWith("ies")) {
-				word = word.substring(0, word.length() - 2);
-			} else {
-				word = word.substring(0, word.length() - 1);
-			}
-		}
-		if (word.endsWith("eed")) {
-
-		}
-		if (word.endsWith("edly") || word.endsWith("ingly")) {
-			word = word.substring(0, word.length() - 2);
-
-		}
-		if (word.endsWith("ed")) {
-			word = word.substring(0, word.length() - 2);
-			if (word.endsWith("at")) {
-				word = word + "e";
-			} else if (word.endsWith("bl")) {
-				word = word + "e";
-			} else if (word.endsWith("iz")) {
-				word = word + "e";
-			}
-		}
-		if (word.endsWith("ing")) {
-			word = word.substring(0, word.length() - 3);
-			if (word.endsWith("at")) {
-				word = word + "e";
-			} else if (word.endsWith("bl")) {
-				word = word + "e";
-			} else if (word.endsWith("iz")) {
-				word = word + "e";
-			}
-		}
-		return word;
+	
+	@Override
+	public Document getDoc(int docid) {
+		return _documents.get(docid);
 	}
 
 	@Override
+	public Document nextDoc(Query query, int docid) {
+		Vector<Integer> ids=new Vector<Integer>();
+		HashMap<Integer,HashMap<String, Integer>> termfreqs=new HashMap<Integer,HashMap<String, Integer>>();
+		int did;
+		for(String q:query._tokens){
+			if(q.contains(" ")){
+				String[] words=q.split(" ");
+				Map<Integer,Vector<Integer>> res = null;
+				long hashterm = (long)words[0].hashCode()+(long)con;
+				if(tmpIndex.containsKey(hashterm)){
+					res = tmpIndex.get(hashterm);
+				}else{
+					res = getTermLine(hashterm);
+					tmpIndex.put(hashterm, res);
+				}
+				SortedSet<Integer> keys = new TreeSet<Integer>(res.keySet());
+				for(int i=0;i<words.length;++i){
+					Map<Integer,Vector<Integer>> res2 = null;
+					long hashterm2 = (long)words[i].hashCode()+(long)con;
+					if(tmpIndex.containsKey(hashterm2)){
+						res2 = tmpIndex.get(hashterm2);
+					}else{
+						res2 = getTermLine(hashterm2);
+						tmpIndex.put(hashterm2, res2);
+					}
+					SortedSet<Integer> keys2 = new TreeSet<Integer>(res2.keySet());
+					keys=getCommon(keys, keys2);
+				}
+				if(keys.size()==0){
+					continue;
+				}
+				Iterator<Integer> key=keys.iterator();
+				while(key.hasNext()){
+					int id=key.next();
+					int sum=0;
+					boolean contains=false;
+					Vector<Integer> pos=tmpIndex.get(words[0]).get(id);
+					for(int i=1;i<words.length;++i){
+						Vector<Integer> pos2=tmpIndex.get(words[i]).get(id);
+						Vector<Integer> newpos=new Vector<Integer>();
+						for(Integer p:pos){
+							if(pos2.contains(p+1)){
+								newpos.add(p+1);
+								if(i==words.length-1){
+									sum++;
+								}
+							}
+						}
+						pos=new Vector<Integer>(newpos);
+					}
+					if(contains){
+						HashMap<String, Integer> freq=new HashMap<String, Integer>();
+						freq.put(q, sum);
+						termfreqs.put(id, freq);
+						ids.add(id);
+					}
+				}
+			}
+		}
+		int id;
+		for(int i=0;i<query._tokens.size();i++){
+			id=next(query._tokens.get(i),docid);
+			 // only add the id that exists
+			if(id != -1 )
+				ids.add(id);  
+		}
+		   // return null if no document contains any term of the query or when couldn't find any document that contains that term
+	   if(ids.size()==0 || ids.size()!=query._tokens.size()){
+		   return null;
+	   }else if(find(ids)){ 
+		   DocumentIndexed d=(DocumentIndexed) getDoc(ids.get(0));
+		   Vector<Integer> tfreqs=new Vector<Integer>();
+		   for(String q:query._tokens){
+				if(q.contains(" ")){
+					tfreqs.add(termfreqs.get(d._docid).get(q));
+				}else{
+					long hashterm = (long)q.hashCode()+(long)con;
+					Map<Integer,Vector<Integer>> res = tmpIndex.get(hashterm);
+					int total=0;
+					for(int doc:res.keySet()){
+						total += res.get(doc).size();
+					}
+					CTFCache.put(q, total);
+					tfreqs.add(total);
+				}
+		   }
+		   d.setDocumentTermFrequency(tfreqs);
+		   return d;
+	   }
+	   else{
+		  return nextDoc(query, max(ids)-1); 
+	   }
+	}
+	
+	private SortedSet<Integer> getCommon(Set<Integer> v1, Set<Integer> v2){
+		SortedSet<Integer> result=new TreeSet<Integer>();
+		Iterator<Integer> it1 = v1.iterator();
+		Iterator<Integer> it2 = v2.iterator();
+		int a=it1.next();
+		int b=it2.next();
+		while(it1.hasNext()&&it2.hasNext()){
+			if(a==b){
+				result.add(a);
+			}else if(a>b){
+				b=it2.next();
+			}else{
+				a=it1.next();
+			}
+		}
+		return result;
+	}
+
+	private boolean find(Vector<Integer> ids) {
+		int first = ids.get(0);
+		for (int i = 1; i < ids.size(); i++) {
+			if (ids.get(i) != first)
+				return false;
+		}
+		return true;
+	}
+
+	private int max(Vector<Integer> ids) {
+		int max = 0;
+		for (int i = 0; i < ids.size(); i++) {
+			if (ids.get(i) > max)
+				max = ids.get(i);
+		}
+		return max;
+	}
+	
+	@Override
 	public void constructIndex() throws IOException {
-		String corpusFile = _options._corpusPrefix;
-		//String corpusFile="data/wiki";
-	    System.out.println("Construct index from: " + corpusFile);
-	    
-	    File root = new File(corpusFile);
+		_index =new HashMap<String,Vector<Vector<Byte>>>();
+		this._totalTermFrequency=0;
+		this._numDocs=0;
+		String corpus = _options._corpusPrefix + "/";
+		System.out.println("Construct index from: " + corpus);
+		int count=0;
+		int did=0;
+		SortedSet<String> allterms=new TreeSet<String>();
+		File root = new File(corpus);
         File[] files = root.listFiles();
-        
-        String constants=_options._indexPrefix+"/compressed/constant.idx";
-        BufferedWriter bw = new BufferedWriter(new FileWriter(constants,true));
-        
-		_freqOffset = new HashMap<String, Vector<Integer>>();
-		_allDocs = new Vector<DocumentIndexed>();
-		Vector<Integer> temp;
-
-		int termOffset = 0;
-		int did = 0;
-		int didIndex = 0;
-		int freq = 0;
-		int freqIndex = 0;
-		int corpusFreq = 0;
-		int partStart = 0;
-		int part = 1;
-		for (int i = 0; i < files.length; i++) {
-			termOffset = 0;
-			String filename=corpusFile + "/"+files[i].getName();
-			System.out.println("reading "+filename);
-			//DocumentIndexed d = new DocumentIndexed(did);
-			//_allDocs.add(d);
-			int pos=0;
-			String content=readToString(filename);
-			content=Html2Text(content);
-			Scanner s=new Scanner(content);
-			while(s.hasNext()){
-				String word=s.next();
-				word=stem(word.toLowerCase());
-				temp = new Vector<Integer>();
-				if (!_freqOffset.containsKey(word)) {
-					temp.add(did);
-					temp.add(1);
-					temp.add(termOffset);
-				} else {
-
-					temp = _freqOffset.get(word);
-
-					didIndex = getCurrentDidIndex(did, temp);
-					if (didIndex == -1) {
-						// case where it is the first instance in a new document after
-						// the initial indexing
-						temp.add(did);
-						temp.add(1);
-						temp.add(termOffset);
-					} else {
-						// Updates the frequency and adds the offset
-						freqIndex = didIndex + 1;
-						freq = temp.get(freqIndex);
-						freq++;
-						temp.set(freqIndex, freq);
-						temp.add(termOffset);
-					}
+        String documents = _options._indexPrefix + "/compressed/documents.idx";
+        File folder=new File(_options._indexPrefix + "/compressed");
+        if(!folder.exists()){
+        	folder.mkdir();
+        }
+		BufferedWriter out2 = new BufferedWriter(new FileWriter(documents));
+        for (int i = 0; i < files.length; i++) {
+        	HashMap<String, Vector<Byte>> positions = new HashMap<String, Vector<Byte>>();
+        	HashMap<String, Integer> freqs = new HashMap<String, Integer>();
+        	String file=corpus +files[i].getName();
+        	String content=getContent(file);
+        	if(content==null){
+        		continue;
+        	}
+        	//DocumentIndexed doc = new DocumentIndexed(did);
+        	//doc.setUrl(files[i].getName());
+        	//doc.setTitle(files[i].getName());
+        	Scanner s = new Scanner(content); 
+        	int p = 1;
+        	Vector<Byte> v_did = vbyteConversion(did);
+  		  	Vector<Byte> enposition = null;
+        	while(s.hasNext()){
+        		String word=s.next();
+        		//System.out.println(word);
+        		if(word==""||word==" "||word.length()==0){
+        			continue;
+        		}
+        		++_totalTermFrequency;
+        		allterms.add(word);
+				if(!positions.containsKey(word)){
+					enposition = new Vector<Byte>();
+					enposition.addAll(v_did);
+					Vector<Byte> v_pos = vbyteConversion(p);
+					enposition.addAll(v_pos);
+					positions.put(word, enposition);
+				}else{
+					enposition=positions.get(word);
+					Vector<Byte> v_pos = vbyteConversion(p);
+			    	enposition.addAll(v_pos);
 				}
-				termOffset++;
-				_freqOffset.put(word, temp);
-			}
-			int bodysize=termOffset+1;
-			bw.write(did+"\t"+files[i].getName()+"\t"+bodysize);
-			bw.newLine();
-			bw.flush();
-		
-			if(did>part*200){
-				saveToFile(part);
-				part++;
-				_freqOffset.clear();
-			}
-			corpusFreq+= bodysize;
-			
-			
-			did++;
-		}
-		saveToFile(part);
-		// Stores the corpus term frequency to file
-		File corpusIndex = new File(_options._indexPrefix+"/compressed/frequency");
-		if (!corpusIndex.exists()) {
-			corpusIndex.mkdir();
-		}
-		File corpusTerms = new File(_options._indexPrefix+"/compressed/frequency/corpusterms.idx");
-		BufferedWriter os = new BufferedWriter(new FileWriter(corpusTerms));
-		os.write(Integer.toString(corpusFreq));
-		os.close();
-	}
-
-	public void saveToFile(int part) {
-		String newline = System.getProperty("line.separator");
-		char letter = 'a';
-		String out = " ";
-		TreeMap<String, Vector<Integer>> tm = new TreeMap<String, Vector<Integer>>(
-				_freqOffset);
-		//String prefix=_options._indexPrefix+"/compressed";
-		String prefix="data/index/compressed";
-		File f = new File(prefix);
-		if (!f.exists()) {
-			f.mkdir();
-		}
-		try {
-
-			if (tm.firstKey().startsWith("")) {
-				tm.remove(tm.firstKey());
-			} 
-			char a=tm.firstKey().charAt(0);
-			//System.out.println(a);
-			while(!Character.isLetter(a)){
-				tm.remove(tm.firstKey());	
-				a=tm.firstKey().charAt(0);
-			}
-			letter = tm.firstKey().charAt(0);
-			//System.out.println(letter);
-			BufferedWriter os = new BufferedWriter(new FileWriter(prefix+"/"
-					+ letter + ".idx.part" + part));
-
-			for (Entry<String, Vector<Integer>> entry : tm.entrySet()) {
-				String key = entry.getKey();
-				if (key.charAt(0) == letter) {
-					out = entry.getKey() + "\t" + compressVector(entry.getValue());
-					os.write(out);
-					os.write(newline);
-				} else {
-					letter = key.charAt(0);
-					if(Character.isLetter(letter)){
-						os = new BufferedWriter(new FileWriter(prefix+"/"
-								+ letter + ".idx.part" + part));
-						out = entry.getKey() + "\t" + compressVector(entry.getValue());
-						os.write(out);
-						os.write(newline);
-					}
+				if(freqs.containsKey(word)){
+					int f=freqs.get(word);
+					freqs.put(word, f+1);
+				}else{
+					freqs.put(word, 1);
 				}
-			}
-			os.flush();
-			os.close();
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+				p++;
+        	}
+        	String filePath = _options._indexPrefix + "/compressed/documents/" + did+".idx";
+        	File docfolder = new File(_options._indexPrefix + "/compressed/documents");
+    		if (!docfolder.exists()) {
+    			docfolder.mkdir();
+    		}
+    		FileOutputStream out3 = new FileOutputStream(filePath);
+        	for (String term : positions.keySet()) {
+    			if (!_index.containsKey(term)) {
+    				Vector<Vector<Byte>> doc_pos = new Vector<Vector<Byte>>();
+    				doc_pos.add(positions.get(term));
+    				_index.put(term, doc_pos);
+    			} else {
+    				Vector<Vector<Byte>> doc_pos = _index.get(term);
+    				doc_pos.add(positions.get(term));
+    			}
+    			byte[] v_term_count = vbyteConversionToArray(freqs.get(term));
+    			long hash_term = (long)term.hashCode()+(long)con;
+    			byte[] v_hash_term = vbyteConversionToArray(hash_term);
+    			out3.write(v_hash_term);
+    			out3.write(v_term_count);
+    		}
+        	out3.close();
+			//out3.flush();
+			out3.close();
+        	//doc.bodySize=p-1;
+        	out2.write(did+"\t"+files[i].getName()+"\t"+files[i].getName()+"\t"+(p-1));
+        	out2.newLine();
+        	//out2.flush();
+        	//_documents.add(doc);
+        	did++;
+        	if((i/200)>count||(i==files.length-1)){
+        		String foldername = _options._indexPrefix+"/compressed";
+        		File tmpfolder = new File(foldername);
+    			if (!tmpfolder.isDirectory()) {
+    				tmpfolder.mkdir();
+    			}
+    			File tmpfile = new File(foldername+"/tmp"+count+".idx");
+    			//FileWriter fileWritter = new FileWriter(tmpfile);
+    			//BufferedWriter bufferWritter = new BufferedWriter(fileWritter);
+    			FileOutputStream fos=new FileOutputStream(tmpfile);
+        		SortedSet<String> keys = new TreeSet<String>(_index.keySet());
+        		//HashMap<Long,Vector<Byte>> map = new HashMap<Long,Vector<Byte>>();
+        		for (String term : keys) {
+        			long termhash = (long)term.hashCode()+(long)con;
+        			fos.write(vbyteConversionToArray(termhash));
+        			//Vector<Byte> finalbytes = new Vector<Byte>();
+        			int totalsize=0;
+        			for(Vector<Byte> bytes:_index.get(term)){
+        				int size = bytes.size();
+        				byte[] byteSize=vbyteConversionToArray(size);
+        				totalsize+=size;
+        				totalsize+=byteSize.length;
+        			}
+        			fos.write(vbyteConversionToArray(totalsize));
+        			for(Vector<Byte> bytes:_index.get(term)){
+        				int size = bytes.size();
+  					  	fos.write(vbyteConversionToArray(size));//size of bytes of all numbers of a doc
+  					  	byte[] termPosContent = new byte[size];
+  					  	for(int j = 0; j<bytes.size(); j++){
+  					  		termPosContent[j] = bytes.get(j);
+  					  	}
+  					  	fos.write(termPosContent);
+        			}
+        			//map.put(termhash, finalbytes);
+        		}
+        		fos.close();
+        		_index.clear();
+        		count++;
+        	}
+        }
+        this._numDocs=did;
+        String statistics = _options._indexPrefix + "/compressed/statistics.idx";
+		BufferedWriter out = new BufferedWriter(new FileWriter(statistics));
+		out.write(""+_numDocs);
+		out.newLine();
+		out.write(""+_totalTermFrequency);
+		out.flush();
+		out.close();
+		//String doc = _options._indexPrefix + "/compressed/documents.idx";
+		//BufferedWriter out2 = new BufferedWriter(new FileWriter(doc));
+		/*
+		for(DocumentIndexed doci:_documents){
+			out2.write(doci._docid+"\t"+doci.getUrl()+"\t"+doci.getTitle()+"\t"+doci.bodySize);
+			out2.newLine();
 		}
-		// maybe we don't have to clear this
-		// _allDocs = new Vector<DocumentIndexed>();
-		//_freqOffset = new HashMap<String, Vector<Integer>>();
-	}
-
-
-	public void loadFromFile(char c) {
-		decompress d = new decompress();
-		final String charName = String.valueOf(c).toLowerCase();
-		if (_freqOffset == null) {
-			_freqOffset = new HashMap<String, Vector<Integer>>();
-		}
-		String line = "";
-		String[] map = { "" };
-		String[] freqMap = { "" };
-		Vector<Integer> temp;
-		File file = new File("data/index/compressed");
-
-		// Filters files by name
-		FilenameFilter textFilter = new FilenameFilter() {
-			public boolean accept(File dir, String name) {
-				if (name.startsWith(charName) && (name.contains(".idx"))) {
-					return true;
-				} else {
-					return false;
-				}
-			}
-		};
-		// Sorts the files because listFiles returns the results backwards
-		File[] sortedFiles = file.listFiles(textFilter);
-		Arrays.sort(sortedFiles);
-		try {
-			// For all files of the name <code c>, enter in the information into
-			// the hashmap
-			for (File entry : sortedFiles) {
-				BufferedReader reader = new BufferedReader(new FileReader(
-						entry.getAbsoluteFile()));
-				while ((line = reader.readLine()) != null) {
-					map = line.split("\t");
-					if (_freqOffset.get(map[0]) != null) {
-						temp = _freqOffset.get(map[0]);
-					} else {
-						temp = new Vector<Integer>();
-					}
-					freqMap = map[1].substring(1, map[1].length() - 1).split(", ");
-					for (int i = 0; i < freqMap.length; i++) {
-						temp.add(d.de_convert(freqMap[i]));
-					}
-					_freqOffset.put(map[0], temp);
-				}
-			}
-		} catch (IOException ioe) {
-			System.err.println("Oops " + ioe.getMessage());
-		}
-
-	}
-
-	public Vector<Integer> getOffsets(Vector<Integer> did, int docid) {
-		Vector<Integer> temp = new Vector<Integer>();
-		int didIndex = 0;
-		int freqIndex = 0;
-		int freq = 0;
-
-		didIndex = getCurrentDidIndex(docid, did);
-		freqIndex = didIndex + 1;
-		freq = did.get(freqIndex);
-		for (int i = 1; i <= freq; i++) {
-			temp.add(did.get(freqIndex + i));
-		}
-		return temp;
-	}
-
-	public Vector<String> compressVector(Vector<Integer> toCompress) {
-		compress hex = new compress();
-		Vector<String> compressed = new Vector<String>();
-		for (Integer i : toCompress) {
-			compressed.add(hex.convert(i));
-		}
-		return compressed;
-	}
-	// Assuming there is only one set of offsets at a time
-	public boolean checkPhrase(Vector<Vector<Integer>> offsets) {
-		Vector<Integer> first = offsets.get(0);
-		// contains is for more than 1 word in the phrase
-		Boolean contains = false;
-
-		for (int i = 0; i < first.size(); i++) {
-			for (int j = 1; j < offsets.size(); j++) {
-				if (offsets.get(j).contains(first.get(i) + j)) {
-					contains = true;
-
-				}
-			}
-			if (contains == true) {
-				return contains;
-			}
-		}
-		// System.out.println(contains);
-		return contains;
-	}
-
-	public Vector<Integer> getMatches(Vector<Vector<Integer>> didOnly,
-			Vector<Vector<Integer>> didOriginal) {
-		Vector<Integer> temp = new Vector<Integer>();
-		Vector<Integer> phrase = new Vector<Integer>();
-		Vector<Vector<Integer>> offsets;
-		Vector<Integer> phraseVector = new Vector<Integer>();
-		Vector<Vector<Integer>> compareFirst = new Vector<Vector<Integer>>();
-		boolean exist = false;
-		boolean isPhrase = false;
-
-		temp = didOnly.get(0);
-
-		for (int j = 0; j < temp.size(); j++) {
-			for (int k = 1; k < didOnly.size(); k++) {
-				if (didOnly.get(k).contains(temp.get(j))) {
-
-					exist = true;
-				} else {
-					// check next did
-					k = 1;
-					exist = false;
-				}
-			}
-			if (exist == true) {
-				phrase.add(temp.get(j));
-			}
-		}
-		// Gets the offsets of all words in the phrase
-		for (int k = 0; k < phrase.size(); k++) {
-			offsets = new Vector<Vector<Integer>>();
-			for (int i = 0; i < didOriginal.size(); i++) {
-				offsets.add(getOffsets(didOriginal.get(i), phrase.get(k)));
-
-			}
-
-			isPhrase = checkPhrase(offsets);
-
-			if (isPhrase == true) {
-
-				phraseVector.add(phrase.get(k));
-				offsets.remove(0);
-			} else {
-				// resets the offsets
-				offsets.remove(0);
-			}
-		}
-		return phraseVector;
+		out2.flush();*/
+		out2.close();
+		merge(allterms);
 
 	}
-
-	public Vector<Integer> getPhraseVector(String[] queryPhrase) {
-
-		Vector<Integer> phraseMatch = new Vector<Integer>();
-
-		Vector<Vector<Integer>> didOnly = new Vector<Vector<Integer>>();
-		Vector<Vector<Integer>> didOriginal = new Vector<Vector<Integer>>();
-		// Gets the vector for each word
-		for (int i = 0; i < queryPhrase.length; i++) {
-			didOriginal.add(_freqOffset.get(queryPhrase[i]));
+	
+	private void merge(SortedSet<String> allterms) throws IOException{
+		String foldername = _options._indexPrefix+"/compressed";
+		//SortedSet<Integer> ids=new TreeSet<Integer>();
+		HashMap<Integer, byte[]> currentLine=new HashMap<Integer, byte[]>();
+		//termlinesize
+		HashMap<Integer, byte[]> currentTLS=new HashMap<Integer, byte[]>();
+		HashMap<Integer, Long> currentTerm=new HashMap<Integer, Long>();
+		File root = new File(foldername);
+        File[] files = root.listFiles();
+        FileInputStream[] readers = new FileInputStream[files.length-3];
+        for (int i = 0; i < files.length-3; i++) {
+        	readers[i] = new FileInputStream(foldername+"/tmp"+i+".idx");
+        }
+        File index = new File(foldername+"/index.idx");
+		if (!index.exists()) {
+			index.createNewFile();
 		}
-
-		didOnly = getOnlyDid(didOriginal);
-
-		phraseMatch = getMatches(didOnly, didOriginal);
-
-		return phraseMatch;
-	}
-
-	/**
-	 * This method gets the did for the case where the index information is
-	 * reset due to adding a different word.
-	 * 
-	 * @param did
-	 * @param temp
-	 * @return
-	 */
-	public Integer getCurrentDidIndex(int did, Vector<Integer> temp) {
-		int tempDid = 0;
-		int didIndex = 0;
-		int freq = 0;
-		int freqIndex = 0;
-
-		while (tempDid != did) {
-
-			tempDid = temp.get(didIndex);
-			freqIndex = didIndex + 1;
-			freq = temp.get(freqIndex);
-
-			if (tempDid != did) {
-				didIndex = freqIndex + freq + 1;
-				freqIndex = didIndex + 1;
-				if (didIndex > temp.size() - 1) {
-					return -1;
-				}
-				freq = temp.get(freqIndex);
-				tempDid = temp.get(didIndex);
-			}
+		FileOutputStream indexWritter = new FileOutputStream(foldername+"/index.idx");
+		/*
+		File log = new File(foldername+"/log.txt");
+		if (!log.exists()) {
+			log.createNewFile();
 		}
-		return didIndex;
+		FileWriter lWritter = new FileWriter(log);
+		BufferedWriter logWritter = new BufferedWriter(lWritter);*/
+        Iterator it = allterms.iterator();
+        while(it.hasNext()){
+        	String term=(String)it.next();
+        	long termHash = (long)term.hashCode()+(long)con;        	
+        	indexWritter.write(vbyteConversionToArray(termHash));
+        	Vector<byte[]> newLines=new Vector<byte[]>();
+        	Vector<byte[]> TLS=new Vector<byte[]>();
+        	//logWritter.write("["+term+"]");
+        	//logWritter.newLine();
+        	for (int i = 0; i < files.length-3; i++) {
+        		//logWritter.write("file: "+i);
+        		//logWritter.newLine();
+        		byte[] line,curTLS;
+        		long currentTermHash;
+        		boolean stored=false;
+        		if(currentLine.containsKey(i)){
+        			line=currentLine.get(i);
+        			currentTermHash=currentTerm.get(i);
+        			curTLS=currentTLS.get(i);
+        			stored=true;
+        			//logWritter.write("get saved line");
+        			//logWritter.newLine();
+        		}else{
+        			Vector<Byte> t= getNextWholeNumber(readers[i]);
+        			if(t.size()==0){
+        				continue;
+        			}
+        			currentTermHash = convertVbyteToNumLong(t);
+        			Vector<Byte> termLineSize=getNextWholeNumber(readers[i]);
+        			curTLS=new byte[termLineSize.size()];
+        			for(int x=0;x<curTLS.length;++x){
+        				curTLS[x]=termLineSize.get(x);
+        			}
+        			int byteLength = convertVbyteToNum(termLineSize);
+        			line = new byte[byteLength];
+        			readers[i].read(line);
+        			//logWritter.write("read in new line: ");
+        			//logWritter.newLine();
+        		}
+        		if(line != null){
+        			//logWritter.write("term: "+term+" hash: "+termHash+" curhash:"+currentTermHash);
+        			//logWritter.write(currentTermHash==termHash?"  =":"    !=");
+        			//logWritter.newLine();
+        			if(currentTermHash==termHash){
+        				//indexWritter.write(curTLS);//Òª¸üÐÂ
+        				//indexWritter.write(line);
+        				TLS.add(curTLS);
+        				newLines.add(line);
+        				//logWritter.write("write in index");
+            			//logWritter.newLine();
+        				if(stored){
+        					currentLine.remove(i);
+        					//logWritter.write("remove saved line");
+        					//logWritter.newLine();
+        				}
+        			}else{
+        				if(!stored){
+        					currentLine.put(i, line);
+        					currentTerm.put(i, currentTermHash);
+        					currentTLS.put(i, curTLS);
+        					//logWritter.write("save line");
+        					//logWritter.newLine();
+        				}
+        			}
+        		}
+        	}
+        	int totalsize=0;
+        	for(int i=0;i<TLS.size();++i){
+        		int tls=convertVbyteToNum(TLS.get(i));
+        		totalsize+=tls;
+        	}
+        	indexWritter.write(vbyteConversionToArray(totalsize));
+        	for(int i=0;i<newLines.size();++i){
+        		indexWritter.write(newLines.get(i));
+        	}
+        }
+        for (int i = 0; i < files.length-3; i++) {
+        	readers[i].close();
+        	File file = new File(foldername+"/tmp"+i+".idx");
+        	file.delete(); 
+        }
+        //indexWritter.flush();
+        indexWritter.close();
+        //logWritter.flush();
+        //logWritter.close();
 	}
 
 	@Override
 	public void loadIndex() throws IOException, ClassNotFoundException {
-		String constantFile = _options._indexPrefix + "/compressed/constant.idx";
-		BufferedReader reader = new BufferedReader(new FileReader(constantFile));
-	    try {
-	      String line = null;
-	      while ((line = reader.readLine()) != null) {
-	    	  Scanner s = new Scanner(line).useDelimiter("\t");
-	    	  int id=Integer.parseInt(s.next());
-	    	  String url=s.next();
-	    	  int bodySize=Integer.parseInt(s.next());
-	    	  DocumentIndexed di=new DocumentIndexed(id);
-	    	  di.setUrl(url);
-	    	  di.bodySize=bodySize;
-	    	  _allDocs.add(di);
-	      }
-	    } finally {
-	      reader.close();
-	    }
-	}
-
-	@Override
-	public Document getDoc(int docid) {
-		SearchEngine.Check(false, "Do NOT change, not used for this Indexer!");
-		return null;
-	}
-
-	public Integer next(int did, Vector<Integer> temp) {
-		int nextDid = 0;
-		int didIndex = 0;
-		int freq = 0;
-		int freqIndex = 0;
-
-		// Gets the current did index
-		didIndex = getCurrentDidIndex(temp.get(did), temp);
-		freqIndex = didIndex + 1;
-		freq = temp.get(freqIndex);
-		nextDid = freq + freqIndex + 1;
-		if (nextDid >= temp.size() - 1) {
-			return -1;
+		String stat = _options._indexPrefix + "/compressed/statistics.idx";
+		String docFile = _options._indexPrefix + "/compressed/documents.idx";
+		_documents=new Vector<DocumentIndexed>();
+		System.out.println("Load index from: " + indexFile);
+		BufferedReader reader = new BufferedReader(new FileReader(stat));
+		String line = null;
+		if ((line = reader.readLine()) != null)
+			this._numDocs = Integer.parseInt(line);
+		if ((line = reader.readLine()) != null)
+			this._totalTermFrequency = Integer.parseInt(line);
+		reader.close();
+		reader = new BufferedReader(new FileReader(docFile));
+		line = null;
+		while((line = reader.readLine()) != null){
+			String[] l = line.split("\t");
+			DocumentIndexed doc=new DocumentIndexed(Integer.parseInt(l[0]));
+			doc.setTitle(l[1]);
+			doc.setUrl(l[2]);
+			doc.bodySize=Integer.parseInt(l[3]);
+			_documents.add(doc);			
 		}
-		// this should return the index of the next did
-		return nextDid;
-	}
-
-	public Vector<Vector<Integer>> getOnlyDid(Vector<Vector<Integer>> allDid) {
-		Vector<Integer> tempDidVector;
-		int tempDid = 0;
-		Vector<Vector<Integer>> did = new Vector<Vector<Integer>>();
-		// Loops through allDid
-		for (int i = 0; i < allDid.size(); i++) {
-			tempDidVector = new Vector<Integer>();
-			// For each vector, remove all integers that is not a did
-			while (tempDid != -1) {
-				// Adds each did index to the tempDidVector. -1 means that it
-				// reached
-				// the end of the vector.;
-				tempDidVector.add(allDid.get(i).get(tempDid));
-				tempDid = next(tempDid, allDid.get(i));
-			}
-			tempDid = 0;
-			did.add(tempDidVector);
-		}
-		return did;
-	}
-
-	/**
-	 * In HW2, you should be using {@link DocumentIndexed}.
-	 * 
-	 * This nextDoc is similar to IndexerInvertedDoconly's nextDoc with the
-	 * exception of the format of the data. nextDoc formats the vector to
-	 * contain just the did's
-	 */
-	@Override
-	public Document nextDoc(Query query, int docid) {
-		Vector<Vector<Integer>> tempDid = new Vector<Vector<Integer>>();
-		Vector<Vector<Integer>> did = new Vector<Vector<Integer>>();
-		query.processQuery();
-		Vector<String> word = query._tokens;
-		Vector<Integer> temp = new Vector<Integer>();
-		int match = docid;
-		int index = 0;
-		int tempIndex = docid;
-		boolean exist = false;
-		String[] removePhrase = {};
-		String [] checkPhrase = {};
-		/*
-		 * This for loop first finds the vector in the hashmap that corresponds to
-		 * the query word and then adds it to did
-		 */
-		
-		for (int i = 0; i < word.size(); i++) {
-		
-			// loads from the related files
-				if(word.get(i).contains(" ") == true) {
-					checkPhrase = word.get(i).split(" ");
-						for(int j = 0;j<checkPhrase.length;j++) {
-								loadFromFile(checkPhrase[j].charAt(0));
-							}
-						if(!getPhraseVector(checkPhrase).isEmpty()) {
-						tempDid.add(getPhraseVector(checkPhrase)); 
-						} else {
-							return new DocumentIndexed(Integer.MAX_VALUE);
-						}
-					}else {
-							loadFromFile(word.get(i).charAt(0));
-							tempDid.add(_freqOffset.get(word.get(i)));
-						}
-		}
-		did = getOnlyDid(tempDid);
-		// Assuming only one did vector which would mean only one query word
-		if (did.size() > 1) {
-			temp = did.get(0);
-
-			index = temp.indexOf(docid) + 1;
-			for (int i = index; i < temp.size(); i++) {
-				for (int k = 1; k < did.size(); k++) {
-					if (did.get(k).contains(temp.get(index))) {
-						exist = true;
-					} else {
-						// check next did
-						k = 1;
-						exist = false;
-					}
-				}
-				if (exist == true) {
-					match = did.get(0).get(index);
-
-					// terminates the while loop
-					index = temp.size();
-				}
-				index++;
-			}
-		} else {
-			// the case for one query word which results in one did so get the
-			// next did
-			if (did.indexOf(docid) != did.size() - 1) {
-				int curIndex = did.get(0).indexOf(docid);
-				match = did.get(0).get(curIndex + 1);
-
-			}
-		}
-		if (match == docid) {
-			return new DocumentIndexed(Integer.MAX_VALUE);
-		} else {
-			// updates the term frequency in the document
-
-			// Flesh this out. _All docs is cleared after saving so maybe create
-			// a new Document? However, it will not retain any prior information
-			DocumentIndexed tempDI = new DocumentIndexed(match);
-
-			for (int i = 0; i < word.size(); i++) {
-				// I believe it is match that is the current document id
-				tempDI.bodySize = getDocumentBodySize(match);
-				tempDI.documentTermFrequency.add(documentTermFrequency(word.get(i),
-						match));
-			}
-			clear();
-			return tempDI;
-		}
-		
-	}
-	public int getDocumentBodySize(int docid) {
-		String posting_list = "INSERT FILE LOCATION";
-		String line = " ";
-		String[] word = {};
-		int bodysize = 0;
-		try {
-			BufferedReader in = new BufferedReader(new FileReader(posting_list));
-			// do we want to store it or just read
-			while((line = in.readLine()) != null) {
-			word = line.split("\t");
-			// url did bodysize 
-				if(Integer.parseInt(word[1]) == docid) {
-					bodysize = Integer.parseInt(word[3]);
-					break;
-				}
-			}
-			
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		return bodysize;
-	}
-	public void clear() {
-		_freqOffset.clear();
+		reader.close();
 	}
 
 	@Override
 	public int corpusDocFrequencyByTerm(String term) {
-			loadFromFile(term.charAt(0));
-		// creates vector of vector of integers to reuse a helper method
-		Vector<Vector<Integer>> termVector = new Vector<Vector<Integer>>();
-		Vector<Vector<Integer>> temp = new Vector<Vector<Integer>>();
-		int numDoc = 0;
-
-		termVector.add(_freqOffset.get(term));
-		temp = getOnlyDid(termVector);
-		numDoc = temp.get(0).size();
-		clear();
-		return numDoc;
+		long hashterm = (long)term.hashCode()+(long)con;
+		Map<Integer,Vector<Integer>> res = null;
+		if(tmpIndex.containsKey(hashterm)){
+			res = tmpIndex.get(hashterm);
+		}
+		else{
+			res = getTermLine(hashterm);
+			tmpIndex.put(hashterm, res);
+		}
+		return res.size();
 	}
 
 	@Override
 	public int corpusTermFrequency(String term) {
-			loadFromFile(term.charAt(0));
-		// creates vector of vector of integers to reuse a helper method
-		Vector<Vector<Integer>> termVector = new Vector<Vector<Integer>>();
-		Vector<Vector<Integer>> temp = new Vector<Vector<Integer>>();
-		int numTerm = 0;
-		int freqIndex = 0;
-		termVector.add(_freqOffset.get(term));
-		// Gets the vector of did
-		temp = getOnlyDid(termVector);
-
-		// adds up the frequency of the term in all documents
-		for (int i = 0; i < temp.get(0).size(); i++) {
-			// gets all freq index using the did + 1
-			freqIndex = temp.get(0).get(i) + 1;
-			numTerm += _freqOffset.get(term).indexOf(freqIndex);
+		if (CTFCache.containsKey(term)) {
+			return CTFCache.get(term);
 		}
-		clear();
-		return numTerm;
-	}
-
-	// Returns the number of instances of the query in the document
-	public int documentTermFrequency(String term, int docid) {
-		Vector<Vector<Integer>> termVector = new Vector<Vector<Integer>>();
-		Vector<Vector<Integer>> temp = new Vector<Vector<Integer>>();
-		int didIndex = 0;
-		int freqIndex = 0;
-		termVector.add(_freqOffset.get(term));
-		// Gets the vector of did
-		didIndex = getCurrentDidIndex(docid, termVector.get(0));
-		freqIndex = didIndex + 1;
-		return _freqOffset.get(term).get(freqIndex);
+		if(term.contains(" ")){
+			String[] words=term.split(" ");
+			Map<Integer,Vector<Integer>> res = null;
+			long hashterm = (long)words[0].hashCode()+(long)con;
+			if(tmpIndex.containsKey(hashterm)){
+				res = tmpIndex.get(hashterm);
+			}else{
+				res = getTermLine(hashterm);
+				tmpIndex.put(hashterm, res);
+			}
+			SortedSet<Integer> keys = new TreeSet<Integer>(res.keySet());
+			for(int i=1;i<words.length;++i){
+				Map<Integer,Vector<Integer>> res2 = null;
+				long hashterm2 = (long)words[i].hashCode()+(long)con;
+				if(tmpIndex.containsKey(hashterm2)){
+					res2 = tmpIndex.get(hashterm2);
+				}else{
+					res2 = getTermLine(hashterm2);
+					tmpIndex.put(hashterm2, res2);
+				}
+				SortedSet<Integer> keys2 = new TreeSet<Integer>(res2.keySet());
+				keys=getCommon(keys, keys2);
+			}
+			if(keys.size()==0){
+				return 0;
+			}
+			Iterator<Integer> key=keys.iterator();
+			int sum=0;
+			while(key.hasNext()){
+				int id=key.next();
+				Vector<Integer> pos=tmpIndex.get(words[0]).get(id);
+				for(int i=1;i<words.length;++i){
+					Vector<Integer> pos2=tmpIndex.get(words[i]).get(id);
+					Vector<Integer> newpos=new Vector<Integer>();
+					for(Integer p:pos){
+						if(pos2.contains(p+1)){
+							newpos.add(p+1);
+							if(i==words.length-1){
+								sum++;
+							}
+						}
+					}
+					pos=new Vector<Integer>(newpos);
+				}
+			}
+			return sum;
+		}else{
+			long hashterm = (long)term.hashCode()+(long)con;
+			Map<Integer,Vector<Integer>> res = null;
+			//Map<Integer,Vector<Integer>> res = getTerm((long)term.hashCode()+(long)con);
+			if(tmpIndex.containsKey(hashterm)){
+				res = tmpIndex.get(hashterm);
+			}else{
+				res = getTermLine(hashterm);
+				tmpIndex.put(hashterm, res);
+			}
+			int total=0;
+			for(int did:res.keySet()){
+				total += res.get(did).size();
+			}
+			CTFCache.put(term, total);
+			return total;
+		}
 	}
 
 	@Override
 	public int documentTermFrequency(String term, String url) {
-		SearchEngine.Check(false, "Not implemented!");
-		return 0;
+		int did=-1;
+		for(DocumentIndexed d:_documents){
+			if(d.getUrl().equals(url)){
+				did=d._docid;
+			}
+		}
+		if(did==-1){
+			return 0;
+		}
+		Map<Integer,Vector<Integer>> res = null;
+		int freq = 0;
+		long hashterm = (long)term.hashCode()+(long)con;
+		if(tmpIndex.containsKey(hashterm)){
+			res = tmpIndex.get(hashterm);
+		}else{
+			res = getTermLine(hashterm);
+			tmpIndex.put(hashterm, res);
+		}
+		if(res.containsKey(did))
+			freq = res.get(did).size();
+		return freq;
 	}
+	
+	private int next(String word, int docid) {
+		long hashword = (long)word.hashCode()+(long)con;
+		Map<Integer,Vector<Integer>> res = null;
+		if(tmpIndex.containsKey(hashword)){
+			 res = tmpIndex.get(hashword);
+		}
+		else{
+			res = getTermLine(hashword);
+			tmpIndex.put(hashword, res);
+		}
+		if(res.size()==0){
+			return -1;
+		}
+		TreeSet<Integer> keySet = new TreeSet<Integer>(res.keySet());
+		Integer nextdoc = keySet.higher(docid);
+	    return nextdoc==null? -1:nextdoc;
+	}
+	
+	public Vector<Byte> vbyteConversion(int num){
+		  Vector<Byte> num_to_bytes = new Vector<Byte>();
+		  boolean firstByte = true;
+		  if(num == 0)
+			  num_to_bytes.add((byte)(1<<7));
+		  while(num>0)
+		  {
+			  byte bytenum = (byte)(num % vmax);
+			  num = num >> 7;
+			  if (firstByte)
+			  {
+				  // indicate the end of a byte, set the hightest bit to 1
+				  bytenum |= 1 << 7;
+				  firstByte = false;
+			  }
+			  num_to_bytes.add(bytenum);	  
+		  }
+		  Collections.reverse(num_to_bytes);
+		  return num_to_bytes;
+	  }
 
-	public static String readToString(String fileName) {  
-        File file = new File(fileName);  
-        Long filelength = file.length();  
-        byte[] filecontent = new byte[filelength.intValue()];  
-        try {  
-            FileInputStream in = new FileInputStream(file);  
-            in.read(filecontent);  
-            in.close();  
-        } catch (FileNotFoundException e) {  
-            e.printStackTrace();  
-        } catch (IOException e) {  
-            e.printStackTrace();  
-        }   
-            return new String(filecontent);  
+	public byte[] vbyteConversionToArray(int num){
+		  if(num == 0){
+			  byte[] res = new byte[1];
+			  res[0] = (byte)(1<<7);
+			  return res;
+		  }
+		  int count = 0;
+		  int temp = num;
+		  boolean firstByte = true;
+		  while(temp>0){
+			  ++ count;
+			  temp = temp >> 7;
+		  }
+		  byte[] res = new byte[count];
+		  int i =0;
+		  while(num > 0){
+			  byte bytenum = (byte)(num % vmax);
+			  num = num >> 7;
+			  if (firstByte)
+			  {
+				  // indicate the end of a byte, set the hightest bit to 1
+				  bytenum |= 1 << 7;
+				  firstByte = false;
+			  }
+			  res[count-1-i] = bytenum;
+			  i++;
+		  }
+		  return res;
+	  }
+	
+	public byte[] vbyteConversionToArray(long num){
+		  if(num == 0){
+			  byte[] res = new byte[1];
+			  res[0] = (byte)(1<<7);
+			  return res;
+		  }
+		  int count = 0;
+		  long temp = num;
+		  boolean firstByte = true;
+		  while(temp>0){
+			  ++ count;
+			  temp = temp >> 7;
+		  }
+		  byte[] res = new byte[count];
+		  int i =0;
+		  while(num > 0){
+			  byte bytenum = (byte)(num % vmax);
+			  num = num >> 7;
+			  if (firstByte){
+				  // indicate the end of a byte, set the hightest bit to 1
+				  bytenum |= 1 << 7;
+				  firstByte = false;
+			  }
+			  res[count-1-i] = bytenum;
+			  i++;
+		  }
+		  return res;
+	  }
+	
+	public int convertVbyteToNum(byte[] vbyte){
+		  if(vbyte.length == 0)
+			  return -1;
+		  int res = 0;
+		  res += (long)(vbyte[vbyte.length-1] & ((1<<7)-1));
+		  for(int i=vbyte.length-2;i>=0;--i)
+			  res+=vbyte[i]*((int)Math.pow(vmax, (vbyte.length-1-i)));
+		  return res;
+	}
+	
+	public int convertVbyteToNum(Vector<Byte> vbyte){
+		  Collections.reverse(vbyte);
+		  if (vbyte == null || vbyte.size() == 0)
+			  return -1;
+		  int res=0;
+		  res += (int) (vbyte.get(0) & ((1<<7)-1)) ;
+		  for(int i=1;i<vbyte.size();i++)
+		  {
+			  res+=vbyte.get(i)*((int)Math.pow(vmax, i));
+		  }		  
+		  return res;
+	}
+	
+	public long convertVbyteToNumLong(byte[] vbyte){
+		  if(vbyte.length == 0)
+			  return -1;
+		  long res = 0;
+		  res += (long)(vbyte[vbyte.length-1] & ((1<<7)-1));
+		  for(int i=vbyte.length-2;i>=0;--i)
+			  res+=vbyte[i]*((long)Math.pow(vmax, (vbyte.length-1-i)));
+		  return res;
+	}
+	
+	public long convertVbyteToNumLong(Vector<Byte> vbyte){
+		  Collections.reverse(vbyte);
+		  if (vbyte == null || vbyte.size() == 0)
+			  return -1;
+		  long res=0;
+		  res += (long) (vbyte.get(0) & ((1<<7)-1)) ;
+		  for(int i=1;i<vbyte.size();i++)
+		  {
+			  res+=vbyte.get(i)*((long)Math.pow(vmax, i));
+		  }		  
+		  return res;
+	}
+	
+	private Vector<Byte> getNextWholeNumber(FileInputStream fis){
+		  Vector<Byte> currentNumber = new Vector<Byte>();
+		  int current;
+		  try{
+			while((current = fis.read())!=-1){
+				  currentNumber.add((byte)current);
+				  if((current & (1<<7)) > 0){
+					  //the current byte is the ending byte
+					  break;
+				  }
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return currentNumber;
+	}
+	
+	private Vector<Vector<Byte>> getNumbers(byte[] input){
+		  Vector<Byte> currentNumber = new Vector<Byte>();
+		  Vector<Vector<Byte>> ret = new Vector<Vector<Byte>>();
+		  byte current;
+		  int index = 0;
+			while(index < input.length){
+				current = input[index++];
+				currentNumber.add((byte)current);
+				if((current & (1<<7)) > 0){
+					//the current byte is the ending byte
+					ret.add(currentNumber);
+					currentNumber = new Vector<Byte>();
+				}
+			}
+		return ret;
+	  }
+	
+	private Map<Integer, Vector<Integer>> getTermLine(long termHash){
+		  Map<Integer, Vector<Integer>> ret = new HashMap<Integer, Vector<Integer>>();
+			try {
+				FileInputStream fis = new FileInputStream(indexFile);
+				long currentTerm;
+				while((currentTerm = convertVbyteToNumLong(getNextWholeNumber(fis)))!= -1){
+					int termLineLength = convertVbyteToNum(getNextWholeNumber(fis));
+					//System.out.println(currentTerm);
+					if(currentTerm != termHash){
+						//System.out.println(termLineLength);
+						fis.skip((long)termLineLength);
+					}
+					else{
+						while(termLineLength > 0){
+							Vector<Byte> lengthByte = getNextWholeNumber(fis);
+							int docLength = convertVbyteToNum(lengthByte);
+							byte[] doc = new byte[docLength];
+							fis.read(doc);
+							Vector<Vector<Byte>> numbers = getNumbers(doc);
+							int docId = convertVbyteToNum(numbers.get(0));
+							Vector<Integer> positions = new Vector<Integer>();
+							for(int i = 1; i<numbers.size(); i++){
+								positions.add(convertVbyteToNum(numbers.get(i)));
+							}
+							//Add the doc and positions to the map
+							ret.put(docId, positions);
+							termLineLength-=(docLength + lengthByte.size());
+						}
+					}
+				}
+
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			return ret;
+	  }
+	
+	public static String getContent(String fileName) {  
+		StringBuilder content = new StringBuilder();
+
+		try {
+			InputStream is = new FileInputStream(fileName);
+			InputStreamReader isr = new InputStreamReader(is, "utf-8");
+			BufferedReader input = new BufferedReader(isr);
+			try {
+				String line = null; // not declared within while loop
+				while ((line = input.readLine()) != null) {
+					content.append(line);
+					content.append(System.getProperty("line.separator"));
+				}
+			} finally {
+				input.close();
+			}
+		} catch (IOException ex) {
+			ex.printStackTrace();
+		}
+        return Html2Text(content.toString());  
     }  
-
+	
 	public static String Html2Text(String inputString) { 
-        String htmlStr = inputString; 
+       /*
+		String htmlStr = inputString; 
             String textStr =""; 
       java.util.regex.Pattern p_script; 
       java.util.regex.Matcher m_script; 
@@ -716,7 +850,55 @@ public class IndexerInvertedCompressed extends Indexer {
                System.err.println("Html2Text: " + e.getMessage()); 
       } 
    
-      return textStr;
-      }   
-  
+      return textStr;*/
+		StringBuilder builder = new StringBuilder();
+		String bodyPattern = "<body.*>.+</body>";
+		Pattern body = Pattern.compile(bodyPattern, Pattern.CASE_INSENSITIVE | Pattern.DOTALL | Pattern.MULTILINE);
+		Matcher bodyResult = body.matcher(inputString);
+		if(!bodyResult.find()){
+			return null;
+		}
+		String bodyString = bodyResult.group(); //process the body of the html
+		// replace all the non-word characters except ' and - to space
+		String resultBody = bodyString.replaceAll("\\&.*?;"," ");
+		//replace all scripts
+		resultBody = resultBody.replaceAll("<script.*?>[\\d\\D]*?</script>"," ");
+		//replace all labels
+		resultBody = resultBody.replaceAll("</?.*?/?>", " ");
+		resultBody = resultBody.replaceAll("[^\\w]", " ");
+
+		// replace duplicate white spaces to one space
+		resultBody = resultBody.replaceAll("\\s+"," ");
+		if(resultBody.equals("")){
+			return null;
+		}
+		builder.append(resultBody);
+		String output = builder.toString();
+		Stemmer stemmer = new Stemmer();
+		stemmer.add(output);
+		stemmer.stem();
+		return stemmer.toString();
+    }	
+	
+	public static void main(String[] args) throws IOException,
+	ClassNotFoundException {
+		Options option = new Options("conf/engine.conf");
+		IndexerInvertedCompressed index = new IndexerInvertedCompressed(option);
+		//index.constructIndex();
+		index.loadIndex();
+		
+		Query query = new Query("Morrow");
+		query.processQuery();
+		
+		DocumentIndexed nextdoc = (DocumentIndexed) index.nextDoc(query, 346);
+		System.out.println(nextdoc._docid+" "+nextdoc.bodySize);
+		//System.out.println(index.corpusTermFrequency("Web"));
+		/*
+		if(nextdoc!=null)
+			System.out.println(nextdoc._docid);
+		else
+			System.out.println("Null");
+		*/
+	}
+
 }
