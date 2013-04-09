@@ -43,10 +43,10 @@ public class RankerFavorite extends Ranker {
 	  Queue<ScoredDocument> D =  new PriorityQueue<ScoredDocument>(numResults,OrderIsdn);
 	  Vector<ScoredDocument> results = new Vector<ScoredDocument>();
 	  DocumentIndexed d=(DocumentIndexed) _indexer.nextDoc(query, -1);
-	  System.out.println(d._docid);
+	  //System.out.println("get:"+d._docid);
 	  while(d!=null){
 		  ScoredDocument s=scoreDocument(query, d);
-		  //System.out.println("score:"+s.getScore());
+		  System.out.println("score:"+s.getScore());
 		  D.add(s);
 		  int id=d._docid;
 		  d=(DocumentIndexed) _indexer.nextDoc(query, id);
@@ -64,8 +64,6 @@ public class RankerFavorite extends Ranker {
   
   // refactored from cosine
   private ScoredDocument scoreDocument(Query query, DocumentIndexed di) {
-
-	  	query.processQuery();
 	  	Vector<String> qv=query._tokens;
 	  	double lambda=0.5;
 	  	double score=0.0;
