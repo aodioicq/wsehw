@@ -14,7 +14,10 @@ public class DocumentIndexed extends Document {
 
   public DocumentIndexed(int docid) {
     super(docid);
-    documentTermFrequency=new Vector<Integer>();
+    //documentTermFrequency=new Vector<Integer>();
   }
 
+  public void setDocumentTermFrequency(Vector<Integer> freqs){
+	  this.documentTermFrequency=new Vector<Integer>(freqs);
+  }
 }

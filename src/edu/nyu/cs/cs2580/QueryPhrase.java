@@ -11,6 +11,7 @@ import java.util.Vector;
  */
 public class QueryPhrase extends Query {
 
+	private boolean processed=false;
   public QueryPhrase(String query) {
     super(query);
   }
@@ -18,6 +19,9 @@ public class QueryPhrase extends Query {
   @Override
   public void processQuery() {
 	  if (_query == null) {
+		  return;
+	  }
+	  if(processed){
 		  return;
 	  }
 	  Scanner s = new Scanner(_query);
@@ -46,6 +50,7 @@ public class QueryPhrase extends Query {
 		  }
 	  }	
 	  s.close();
+	  processed=true;
   }
   /*
   public static void main(String[] args) {
