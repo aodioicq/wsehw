@@ -198,6 +198,7 @@ public class CorpusAnalyzerPagerank extends CorpusAnalyzer {
 						Integer.parseInt(parseLine[2]));
 			}
 		}
+		br.close();
 	}
 	/**
 	 * This function computes the PageRank based on the internal graph generated
@@ -352,6 +353,7 @@ public class CorpusAnalyzerPagerank extends CorpusAnalyzer {
 			bw.write(out);
 			bw.write(newline);
 		}
+		bw.close();
 	}
 
 	public void loadNV(File numviews) throws IOException {
@@ -368,5 +370,6 @@ public class CorpusAnalyzerPagerank extends CorpusAnalyzer {
 			bw.write(out);
 			bw.write(newline);
 		}
+		bw.close();
 	}
 }
