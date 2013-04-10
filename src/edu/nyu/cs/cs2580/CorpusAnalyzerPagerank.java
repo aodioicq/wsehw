@@ -280,7 +280,121 @@ public class CorpusAnalyzerPagerank extends CorpusAnalyzer {
    */
   @Override
   public void compute() throws IOException {
-    System.out.println("Computing using " + this.getClass().getName());
+        System.out.println("Computing using " + this.getClass().getName());
+	    
+		double lamma=0.1;//constant is given
+		int n = maxDocs;
+		int i,j;
+		int temp []=new int[n];  
+		int sum=0;
+		double[] r_vector = new double [n]; //initial rank vector;
+		double g_matrix [][] = new double [n][n];//google matrix;
+		double t_matrix [][] = new double [n][n]; //transition matrix based on link matrix;
+		double k_matrix [][] = new double [n][n]; //helper matrix;
+		double page_rank[] =new double [n];//page rank vector;
+		double iter_vec[]=new double[n];//helper
+		double itera[][]= new double [n][n];//helper
+		Map<Integer,Double> pagerank_sp = new HashMap<Integer,Double>();
+		Map<Integer,Integer> hm3 = new HashMap<Integer,Integer>();
+		Map<Integer,Integer> hm4 = new HashMap<Integer,Integer>();
+		//Map<Integer,Integer> numberofviewd_sp = new HashMap<Integer,Integer>();
+		for (i=0;i<n;i++){
+			for (j=0; j<n;j++){
+				
+				
+				r_vector[j]=(double) 1/n;
+				k_matrix[i][j]=(double)1/n;
+				
+			}
+		}
+		
+		
+	int row_sum=0;
+		for (i=0;i<n;i++){
+			for (j=0; j<n;j++){
+				row_sum=row_sum+matrix[i][j];
+		}
+	        temp[i]=row_sum;
+	        row_sum=0;
+	
+		}
+		
+		//creating transition matrix;
+		for (i=0;i<n;i++){
+			for (j=0; j<n;j++){
+		t_matrix[i][j]=(double)matrix[i][j]/temp[i];
+		//System.out.println("["+i+"]["+j+"]= "+t_matrix[i][j]);
+		  }
+	    }
+		
+		
+		
+		//transpose the transition matrix;
+		for (i=0;i<n;i++){
+			for (j=i; j<n;j++){
+		double t=t_matrix[i][j];
+		t_matrix[i][j]=t_matrix[j][i];
+		t_matrix[j][i]=t;
+		
+		  }
+	    }
+		
+	
+			//calculating the google matrix;
+		for (i=0;i<n;i++){
+			for (j=0; j<n;j++){
+		g_matrix[i][j]=(double)lamma*t_matrix[i][j] +(double)(1-lamma)*k_matrix[i][j];
+		itera[i][j]=g_matrix[i][j];
+		
+			}
+			
+		}
+		
+	
+	
+	  System.out.println("the page rank is with one iteration");
+		double sum1=0.0;
+		
+		 for (int c = 0 ; c < n ; c++ )
+         {
+            for (int d = 0 ; d < n ; d++ )
+            {   
+               
+                    sum1 = sum1 + g_matrix[c][d]* r_vector[d];
+                   // System.out.println("sum is: "+sum1);
+               }
+         
+ 
+               r_vector[c] = sum1;
+               iter_vec[c]=r_vector[c];
+            // System.out.println(r_vector[c]);
+              //System.out.print("\n");
+               pagerank_sp.put(c+1, r_vector[c]);
+               sum1 = 0.0;
+         }
+		 
+		
+/*	 System.out.println("page rank with two iterations:");
+		 double sum2=0.0;
+			
+		 for (int c = 0 ; c < n ; c++ )
+         {
+            for (int d = 0 ; d < n ; d++ )
+            {   
+               
+                    sum2 = sum2 + itera[c][d]* iter_vec[d];
+                   // System.out.println("sum is: "+sum1);
+               }
+         
+ 
+               r_vector[c] = sum2;
+             System.out.println(r_vector[c]);
+              //System.out.print("\n");
+               sum2 = 0.0;
+         }
+		*/
+	    
+
     return;
   }
 
