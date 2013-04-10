@@ -2,7 +2,7 @@ package edu.nyu.cs.cs2580;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
+
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.Comparator;
@@ -10,12 +10,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.Map.Entry;
-import java.util.Collections;
-import java.util.List;
-import java.util.Vector;
+
 
 public class Spearman {
-  static Map<Integer, Double> pagerank_sp = new HashMap<Integer, Double>();
+	static Map<Integer, Double> pagerank_sp = new HashMap<Integer, Double>();
 	static Map<Integer, Integer> numberofviewd_sp = new HashMap<Integer, Integer>();
 	private static int maxDocs;
 
@@ -32,6 +30,7 @@ public class Spearman {
 			parsed = line.split("\t");
 			pagerank_sp.put(Integer.parseInt(parsed[0]), Double.parseDouble(parsed[1]));
 		}
+		br.close();
 	}
 
 	public static void loadNV(String numViews) throws NumberFormatException, IOException {
@@ -45,6 +44,7 @@ public class Spearman {
 			parsed = line.split("\t");
 			numberofviewd_sp.put(Integer.parseInt(parsed[0]), Integer.parseInt(parsed[1]));
 		}
+		br.close();
 	}
 
 	public static void page(int numberofdocs) {// the total number of docs in
