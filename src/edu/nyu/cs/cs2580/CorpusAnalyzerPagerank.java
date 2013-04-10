@@ -292,7 +292,50 @@ public class CorpusAnalyzerPagerank extends CorpusAnalyzer {
    */
   @Override
   public Object load() throws IOException {
-    System.out.println("Loading using " + this.getClass().getName());
-    return null;
-  }
+		System.out.println("Loading using " + this.getClass().getName());
+		File pagerank = new File("data/pagerank.txt");
+		File numview = new File("data/numview.txt");
+		
+		if (!pagerank.exists()) {
+			pagerank.createNewFile();
+		}
+		if (!numview.exists()) {
+			numview.createNewFile();
+		}
+		loadPr(pagerank);
+		loadNV(numview);
+		return null;
+	}
+
+
+	public void loadPr(File pagerank) throws IOException {
+		String newline = System.getProperty("line.separator");
+		String out = " ";
+		TreeMap<Integer, Double> tm = new TreeMap<Integer, Double>(pagerank_sp);
+		BufferedWriter bw = new BufferedWriter(new FileWriter(
+				pagerank.getAbsoluteFile()));
+
+		for (Entry<Integer, Double> entry : tm.entrySet()) {
+			out = entry.getKey().toString() + "\t"
+					+ entry.getValue().toString();
+			bw.write(out);
+			bw.write(newline);
+		}
+	}
+
+	public void loadNV(File numviews) throws IOException {
+		String newline = System.getProperty("line.separator");
+		String out = " ";
+		TreeMap<Integer, Integer> tm = new TreeMap<Integer, Integer>(numViewMap);
+	
+		BufferedWriter bw = new BufferedWriter(new FileWriter(
+				numviews.getAbsoluteFile()));
+
+		for (Entry<Integer, Integer> entry : tm.entrySet()) {
+			out = entry.getKey().toString() + "\t"
+					+ entry.getValue().toString();
+			bw.write(out);
+			bw.write(newline);
+		}
+	}
 }
