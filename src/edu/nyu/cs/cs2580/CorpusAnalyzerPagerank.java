@@ -13,7 +13,6 @@ import java.util.TreeMap;
 import java.util.Vector;
 import java.util.Map.Entry;
 
-
 import edu.nyu.cs.cs2580.SearchEngine.Options;
 
 /**
@@ -26,7 +25,6 @@ public class CorpusAnalyzerPagerank extends CorpusAnalyzer {
 
 	private String corpusFile = "data/wiki";
 	private HashMap<String, Integer> postingMap = new HashMap<String, Integer>();
-	private HashMap<Integer, Integer> numViewMap = new HashMap<Integer, Integer>();
 	private Map<Integer, Double> pagerank_sp = new HashMap<Integer, Double>();
 	private String newline = System.getProperty("line.separator");
 	private int maxDocs;
@@ -67,6 +65,10 @@ public class CorpusAnalyzerPagerank extends CorpusAnalyzer {
 		createMatrix();
 
 		return;
+	}
+
+	private void writePostingMap() {
+
 	}
 
 	private void crawl() {
@@ -183,23 +185,6 @@ public class CorpusAnalyzerPagerank extends CorpusAnalyzer {
 		}
 	}
 
-	private void numViews() throws IOException {
-		String line;
-		String[] parseLine;
-		File log = new File("data/log/20130301-160000.log");
-		BufferedReader br = new BufferedReader(new FileReader(
-				log.getAbsoluteFile()));
-
-		while ((line = br.readLine()) != null) {
-			parseLine = line.split(" ");
-
-			if (postingMap.containsKey(parseLine[1])) {
-				numViewMap.put(postingMap.get(parseLine[1]),
-						Integer.parseInt(parseLine[2]));
-			}
-		}
-		br.close();
-	}
 	/**
 	 * This function computes the PageRank based on the internal graph generated
 	 * by the {@link prepare} function, and stores the PageRank to be used for
@@ -300,7 +285,7 @@ public class CorpusAnalyzerPagerank extends CorpusAnalyzer {
 			pagerank_sp.put(c + 1, r_vector[c]);
 			sum1 = 0.0;
 		}
-
+		write();
 		/*
 		 * System.out.println("page rank with two iterations:"); double
 		 * sum2=0.0;
@@ -317,35 +302,18 @@ public class CorpusAnalyzerPagerank extends CorpusAnalyzer {
 
 	}
 
-	/**
-	 * During indexing mode, this function loads the PageRank values computed
-	 * during mining mode to be used by the indexer.
-	 * 
-	 * @throws IOException
-	 */
-	@Override
-	public Object load() throws IOException {
-		System.out.println("Loading using " + this.getClass().getName());
+	private void write() throws IOException {
+
 		File pagerank = new File("data/pagerank.txt");
-		File numview = new File("data/numview.txt");
-
-		if (!pagerank.exists()) {
-			pagerank.createNewFile();
-		}
-		if (!numview.exists()) {
-			numview.createNewFile();
-		}
-		loadPr(pagerank);
-		loadNV(numview);
-		return null;
-	}
-
-	public void loadPr(File pagerank) throws IOException {
 		String newline = System.getProperty("line.separator");
 		String out = " ";
 		TreeMap<Integer, Double> tm = new TreeMap<Integer, Double>(pagerank_sp);
 		BufferedWriter bw = new BufferedWriter(new FileWriter(
 				pagerank.getAbsoluteFile()));
+
+		if (!pagerank.exists()) {
+			pagerank.createNewFile();
+		}
 
 		for (Entry<Integer, Double> entry : tm.entrySet()) {
 			out = entry.getKey().toString() + "\t"
@@ -354,22 +322,33 @@ public class CorpusAnalyzerPagerank extends CorpusAnalyzer {
 			bw.write(newline);
 		}
 		bw.close();
+
 	}
 
-	public void loadNV(File numviews) throws IOException {
-		String newline = System.getProperty("line.separator");
-		String out = " ";
-		TreeMap<Integer, Integer> tm = new TreeMap<Integer, Integer>(numViewMap);
-
-		BufferedWriter bw = new BufferedWriter(new FileWriter(
-				numviews.getAbsoluteFile()));
-
-		for (Entry<Integer, Integer> entry : tm.entrySet()) {
-			out = entry.getKey().toString() + "\t"
-					+ entry.getValue().toString();
-			bw.write(out);
-			bw.write(newline);
+	/**
+	 * During indexing mode, this function loads the PageRank values computed
+	 * during mining mode to be used by the indexer.
+	 * 
+	 * @throws NumberFormatException
+	 * @throws IOException
+	 */
+	@Override
+	public Object load() throws NumberFormatException, IOException {
+		System.out.println("Loading using " + this.getClass().getName());
+		String pageRank = "data/pagerank.txt";
+		String line;
+		String[] parsed;
+		maxDocs = 0;
+		File pr = new File(pageRank);
+		BufferedReader br = new BufferedReader(new FileReader(
+				pr.getAbsoluteFile()));
+		while ((line = br.readLine()) != null) {
+			maxDocs++;
+			parsed = line.split("\t");
+			pagerank_sp.put(Integer.parseInt(parsed[0]),
+					Double.parseDouble(parsed[1]));
 		}
-		bw.close();
+		return null;
 	}
+
 }
