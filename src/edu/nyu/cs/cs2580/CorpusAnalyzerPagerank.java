@@ -57,6 +57,7 @@ public class CorpusAnalyzerPagerank extends CorpusAnalyzer {
 
 		for (File file : root.listFiles()) {
 			postingMap.put(file.getName(), docid);
+			writePostingMap(file.getName(),docid);
 			docid++;
 		}
 		maxDocs = docid;
@@ -67,8 +68,19 @@ public class CorpusAnalyzerPagerank extends CorpusAnalyzer {
 		return;
 	}
 
-	private void writePostingMap() {
-
+	private void writePostingMap(String filename,int docid) throws IOException {
+		String newline = System.getProperty("line.separator");
+		File post = new File("postingmap.txt");
+		if(!post.exists()) {
+			post.createNewFile();
+		}
+		
+		BufferedWriter bw = new BufferedWriter(new FileWriter(post.getAbsoluteFile(),true));
+		String out = filename + "\t" + docid;
+		bw.write(out);
+		bw.write(newline);
+		bw.close();
+		
 	}
 
 	private void crawl() {
@@ -348,6 +360,7 @@ public class CorpusAnalyzerPagerank extends CorpusAnalyzer {
 			pagerank_sp.put(Integer.parseInt(parsed[0]),
 					Double.parseDouble(parsed[1]));
 		}
+		br.close();
 		return null;
 	}
 
