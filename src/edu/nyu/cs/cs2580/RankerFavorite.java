@@ -43,13 +43,12 @@ public class RankerFavorite extends Ranker {
 	  Queue<ScoredDocument> D =  new PriorityQueue<ScoredDocument>(numResults,OrderIsdn);
 	  Vector<ScoredDocument> results = new Vector<ScoredDocument>();
 	  DocumentIndexed d=(DocumentIndexed) _indexer.nextDoc(query, -1);
-	  //System.out.println(d._docid);
 	  while(d!=null){
+		  //System.out.println(d._docid);
 		  ScoredDocument s=scoreDocument(query, d);
 		  //System.out.println("score:"+s.getScore());
 		  D.add(s);
 		  d=(DocumentIndexed) _indexer.nextDoc(query, d._docid);
-		  //System.out.println(d._docid);
 	  }
 	  results.addAll(D);
 	  System.out.println("finish ranking");
@@ -58,11 +57,10 @@ public class RankerFavorite extends Ranker {
   
   // refactored from cosine
   private ScoredDocument scoreDocument(Query query, DocumentIndexed di) {
-
-	  	query.processQuery();
 	  	Vector<String> qv=query._tokens;
 	  	double lambda=0.5;
 	  	double score=0.0;
+	  	//System.out.println("size:"+qv.size());
 	  	for(int i = 0; i<qv.size(); i++){
 	    	String currentTerm = qv.get(i);
 	    	int dtf=di.documentTermFrequency.get(i);

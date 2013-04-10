@@ -11,6 +11,7 @@ import java.util.Vector;
  */
 public class QueryPhrase extends Query {
 
+	private boolean processed=false;
   public QueryPhrase(String query) {
     super(query);
   }
@@ -20,6 +21,10 @@ public class QueryPhrase extends Query {
 	  if (_query == null) {
 		  return;
 	  }
+	  if(processed){
+		  return;
+	  }
+	  processed=true;
 	  Scanner s = new Scanner(_query);
 	  while (s.hasNext()) {
 		  String term=s.next();
@@ -46,6 +51,7 @@ public class QueryPhrase extends Query {
 		  }
 	  }	
 	  s.close();
+	  
   }
   /*
   public static void main(String[] args) {

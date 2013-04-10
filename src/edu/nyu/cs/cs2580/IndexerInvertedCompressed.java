@@ -4,18 +4,14 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Scanner;
@@ -33,12 +29,17 @@ public class IndexerInvertedCompressed extends Indexer {
 	private static final int vmax = 128;
 	static final int con = Integer.MAX_VALUE;
 	private String indexFile = _options._indexPrefix + "/compressed/index.idx";
+	public String indexFolder= _options._indexPrefix + "/compressed";
 	//term did positions
 	private Map<Long,Map<Integer,Vector<Integer>>> tmpIndex = new LRUMap<Long,Map<Integer,Vector<Integer>>>(1000,1000);
-	private HashMap<String,Integer> CTFCache=new HashMap<String,Integer>();
+	//private HashMap<Long,Map<Integer,Vector<Integer>>> tmpIndex = new HashMap<Long,Map<Integer,Vector<Integer>>>();
+	private HashMap<String,Integer> CTFCache=new LRUMap<String,Integer>(1000,1000);
+	private HashMap<String,TreeSet<Integer>> phraseList=new LRUMap<String,TreeSet<Integer>>(100,100);
 	//term did(positions in bytes)
 	private HashMap<String, Vector<Vector<Byte>>> _index;
 	private Vector<DocumentIndexed> _documents;
+	private Map<Integer,Float> pageranks = null;
+	private Map<Integer,Integer> numviews = null;
 	
 	public IndexerInvertedCompressed(Options options) {
 		super(options);
@@ -54,48 +55,63 @@ public class IndexerInvertedCompressed extends Indexer {
 	public Document nextDoc(Query query, int docid) {
 		Vector<Integer> ids=new Vector<Integer>();
 		HashMap<Integer,HashMap<String, Integer>> termfreqs=new HashMap<Integer,HashMap<String, Integer>>();
-		int did;
 		for(String q:query._tokens){
 			if(q.contains(" ")){
+				SortedSet<Integer> keys=null;
 				String[] words=q.split(" ");
-				Map<Integer,Vector<Integer>> res = null;
-				long hashterm = (long)words[0].hashCode()+(long)con;
-				if(tmpIndex.containsKey(hashterm)){
-					res = tmpIndex.get(hashterm);
-				}else{
-					res = getTermLine(hashterm);
-					tmpIndex.put(hashterm, res);
-				}
-				SortedSet<Integer> keys = new TreeSet<Integer>(res.keySet());
-				for(int i=0;i<words.length;++i){
-					Map<Integer,Vector<Integer>> res2 = null;
-					long hashterm2 = (long)words[i].hashCode()+(long)con;
-					if(tmpIndex.containsKey(hashterm2)){
-						res2 = tmpIndex.get(hashterm2);
+				if(phraseList.containsKey(q)){
+					keys=phraseList.get(q);
+				}else{				
+					Map<Integer,Vector<Integer>> res = null;
+					long hashterm = (long)words[0].hashCode()+(long)con;
+					if(tmpIndex.containsKey(hashterm)){
+						res = tmpIndex.get(hashterm);
 					}else{
-						res2 = getTermLine(hashterm2);
-						tmpIndex.put(hashterm2, res2);
+						res = getTermLine(hashterm);
+						tmpIndex.put(hashterm, res);
 					}
-					SortedSet<Integer> keys2 = new TreeSet<Integer>(res2.keySet());
-					keys=getCommon(keys, keys2);
+					keys = new TreeSet<Integer>(res.keySet());
+					//System.out.println("1: "+keys.toString());
+					for(int i=1;i<words.length;++i){
+						//System.out.println(words[i]);
+						Map<Integer,Vector<Integer>> res2 = null;
+						long hashterm2 = (long)words[i].hashCode()+(long)con;
+						if(tmpIndex.containsKey(hashterm2)){
+							res2 = tmpIndex.get(hashterm2);
+						}else{
+							res2 = getTermLine(hashterm2);
+							tmpIndex.put(hashterm2, res2);
+						}
+						SortedSet<Integer> keys2 = new TreeSet<Integer>(res2.keySet());
+						//System.out.println(keys2.toString());
+						keys=getCommon(keys, keys2);
+					}
+					phraseList.put(q, (TreeSet<Integer>) keys);
 				}
+				//System.out.println("keys:"+keys.toString());
 				if(keys.size()==0){
 					continue;
 				}
 				Iterator<Integer> key=keys.iterator();
 				while(key.hasNext()){
 					int id=key.next();
+					if(id<=docid){
+						continue;
+					}
 					int sum=0;
 					boolean contains=false;
-					Vector<Integer> pos=tmpIndex.get(words[0]).get(id);
+					long hash = (long)words[0].hashCode()+(long)con;
+					Vector<Integer> pos=tmpIndex.get(hash).get(id);
 					for(int i=1;i<words.length;++i){
-						Vector<Integer> pos2=tmpIndex.get(words[i]).get(id);
+						long hash2 = (long)words[i].hashCode()+(long)con;
+						Vector<Integer> pos2=tmpIndex.get(hash2).get(id);
 						Vector<Integer> newpos=new Vector<Integer>();
 						for(Integer p:pos){
 							if(pos2.contains(p+1)){
 								newpos.add(p+1);
 								if(i==words.length-1){
 									sum++;
+									contains=true;
 								}
 							}
 						}
@@ -106,17 +122,22 @@ public class IndexerInvertedCompressed extends Indexer {
 						freq.put(q, sum);
 						termfreqs.put(id, freq);
 						ids.add(id);
+						break;
 					}
 				}
 			}
 		}
 		int id;
 		for(int i=0;i<query._tokens.size();i++){
+			if(query._tokens.get(i).contains(" ")){
+				continue;
+			}
 			id=next(query._tokens.get(i),docid);
 			 // only add the id that exists
 			if(id != -1 )
 				ids.add(id);  
 		}
+		//System.out.println("size:"+ids.size());
 		   // return null if no document contains any term of the query or when couldn't find any document that contains that term
 	   if(ids.size()==0 || ids.size()!=query._tokens.size()){
 		   return null;
@@ -127,14 +148,18 @@ public class IndexerInvertedCompressed extends Indexer {
 				if(q.contains(" ")){
 					tfreqs.add(termfreqs.get(d._docid).get(q));
 				}else{
+					Map<Integer,Vector<Integer>> res = null;
+					int freq = 0;
 					long hashterm = (long)q.hashCode()+(long)con;
-					Map<Integer,Vector<Integer>> res = tmpIndex.get(hashterm);
-					int total=0;
-					for(int doc:res.keySet()){
-						total += res.get(doc).size();
+					if(tmpIndex.containsKey(hashterm)){
+						res = tmpIndex.get(hashterm);
+					}else{
+						res = getTermLine(hashterm);
+						tmpIndex.put(hashterm, res);
 					}
-					CTFCache.put(q, total);
-					tfreqs.add(total);
+					if(res.containsKey(ids.get(0)))
+						freq = res.get(ids.get(0)).size();
+					tfreqs.add(freq);
 				}
 		   }
 		   d.setDocumentTermFrequency(tfreqs);
@@ -154,6 +179,8 @@ public class IndexerInvertedCompressed extends Indexer {
 		while(it1.hasNext()&&it2.hasNext()){
 			if(a==b){
 				result.add(a);
+				a=it1.next();
+				b=it2.next();
 			}else if(a>b){
 				b=it2.next();
 			}else{
@@ -181,8 +208,15 @@ public class IndexerInvertedCompressed extends Indexer {
 		return max;
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Override
 	public void constructIndex() throws IOException {
+		/*
+		CorpusAnalyzer ca = new CorpusAnalyzerPagerank(_options);
+	  	pageranks = (HashMap<Integer,Float>)ca.load();
+	  	LogMinerNumviews log = new LogMinerNumviews(_options);
+	  	numviews = (HashMap<Integer,Integer>)log.load();
+		*/
 		_index =new HashMap<String,Vector<Vector<Byte>>>();
 		this._totalTermFrequency=0;
 		this._numDocs=0;
@@ -241,6 +275,7 @@ public class IndexerInvertedCompressed extends Indexer {
 				}
 				p++;
         	}
+        	s.close();
         	String filePath = _options._indexPrefix + "/compressed/documents/" + did+".idx";
         	File docfolder = new File(_options._indexPrefix + "/compressed/documents");
     		if (!docfolder.exists()) {
@@ -266,7 +301,16 @@ public class IndexerInvertedCompressed extends Indexer {
 			//out3.flush();
 			out3.close();
         	//doc.bodySize=p-1;
-        	out2.write(did+"\t"+files[i].getName()+"\t"+files[i].getName()+"\t"+(p-1));
+			/*
+			float pagerank = 0;
+		    if(this.pageranks.containsKey(did))
+		    	pagerank = this.pageranks.get(did);
+		    int views = 0;
+		    if(this.numviews.containsKey(did))
+		    	views = this.numviews.get(did);
+		    	*/
+        	//out2.write(did+"\t"+files[i].getName()+"\t"+files[i].getName()+"\t"+(p-1)+"\t"+pagerank+"\t"+views);
+			out2.write(did+"\t"+files[i].getName()+"\t"+files[i].getName()+"\t"+(p-1));
         	out2.newLine();
         	//out2.flush();
         	//_documents.add(doc);
@@ -357,7 +401,7 @@ public class IndexerInvertedCompressed extends Indexer {
 		}
 		FileWriter lWritter = new FileWriter(log);
 		BufferedWriter logWritter = new BufferedWriter(lWritter);*/
-        Iterator it = allterms.iterator();
+        Iterator<String> it = allterms.iterator();
         while(it.hasNext()){
         	String term=(String)it.next();
         	long termHash = (long)term.hashCode()+(long)con;        	
@@ -401,7 +445,7 @@ public class IndexerInvertedCompressed extends Indexer {
         			//logWritter.write(currentTermHash==termHash?"  =":"    !=");
         			//logWritter.newLine();
         			if(currentTermHash==termHash){
-        				//indexWritter.write(curTLS);//Òª¸üÐÂ
+        				//indexWritter.write(curTLS);
         				//indexWritter.write(line);
         				TLS.add(curTLS);
         				newLines.add(line);
@@ -465,6 +509,8 @@ public class IndexerInvertedCompressed extends Indexer {
 			doc.setTitle(l[1]);
 			doc.setUrl(l[2]);
 			doc.bodySize=Integer.parseInt(l[3]);
+			//doc.setPageRank(Float.parseFloat(l[4]));
+			//doc.setNumViews(Integer.parseInt(l[5]));
 			_documents.add(doc);			
 		}
 		reader.close();
@@ -491,37 +537,44 @@ public class IndexerInvertedCompressed extends Indexer {
 		}
 		if(term.contains(" ")){
 			String[] words=term.split(" ");
-			Map<Integer,Vector<Integer>> res = null;
-			long hashterm = (long)words[0].hashCode()+(long)con;
-			if(tmpIndex.containsKey(hashterm)){
-				res = tmpIndex.get(hashterm);
-			}else{
-				res = getTermLine(hashterm);
-				tmpIndex.put(hashterm, res);
-			}
-			SortedSet<Integer> keys = new TreeSet<Integer>(res.keySet());
-			for(int i=1;i<words.length;++i){
-				Map<Integer,Vector<Integer>> res2 = null;
-				long hashterm2 = (long)words[i].hashCode()+(long)con;
-				if(tmpIndex.containsKey(hashterm2)){
-					res2 = tmpIndex.get(hashterm2);
+			SortedSet<Integer> keys=null;
+			if(phraseList.containsKey(term)){
+				keys=phraseList.get(term);
+			}else{				
+				Map<Integer,Vector<Integer>> res = null;
+				long hashterm = (long)words[0].hashCode()+(long)con;
+				if(tmpIndex.containsKey(hashterm)){
+					res = tmpIndex.get(hashterm);
 				}else{
-					res2 = getTermLine(hashterm2);
-					tmpIndex.put(hashterm2, res2);
+					res = getTermLine(hashterm);
+					tmpIndex.put(hashterm, res);
 				}
-				SortedSet<Integer> keys2 = new TreeSet<Integer>(res2.keySet());
-				keys=getCommon(keys, keys2);
+				keys = new TreeSet<Integer>(res.keySet());
+				for(int i=1;i<words.length;++i){
+					Map<Integer,Vector<Integer>> res2 = null;
+					long hashterm2 = (long)words[i].hashCode()+(long)con;
+					if(tmpIndex.containsKey(hashterm2)){
+						res2 = tmpIndex.get(hashterm2);
+					}else{
+						res2 = getTermLine(hashterm2);
+						tmpIndex.put(hashterm2, res2);
+					}
+					SortedSet<Integer> keys2 = new TreeSet<Integer>(res2.keySet());
+					keys=getCommon(keys, keys2);
+				}
 			}
 			if(keys.size()==0){
 				return 0;
 			}
-			Iterator<Integer> key=keys.iterator();
 			int sum=0;
+			Iterator<Integer> key=keys.iterator();
 			while(key.hasNext()){
 				int id=key.next();
-				Vector<Integer> pos=tmpIndex.get(words[0]).get(id);
+				long hash = (long)words[0].hashCode()+(long)con;
+				Vector<Integer> pos=tmpIndex.get(hash).get(id);
 				for(int i=1;i<words.length;++i){
-					Vector<Integer> pos2=tmpIndex.get(words[i]).get(id);
+					long hash2 = (long)words[i].hashCode()+(long)con;
+					Vector<Integer> pos2=tmpIndex.get(hash2).get(id);
 					Vector<Integer> newpos=new Vector<Integer>();
 					for(Integer p:pos){
 						if(pos2.contains(p+1)){
@@ -534,6 +587,7 @@ public class IndexerInvertedCompressed extends Indexer {
 					pos=new Vector<Integer>(newpos);
 				}
 			}
+			CTFCache.put(term, sum);
 			return sum;
 		}else{
 			long hashterm = (long)term.hashCode()+(long)con;
@@ -577,6 +631,10 @@ public class IndexerInvertedCompressed extends Indexer {
 		if(res.containsKey(did))
 			freq = res.get(did).size();
 		return freq;
+	}
+	
+	public int documentTermFrequency(String term, int id) {
+		return 0;
 	}
 	
 	private int next(String word, int docid) {
@@ -781,10 +839,12 @@ public class IndexerInvertedCompressed extends Indexer {
 							for(int i = 1; i<numbers.size(); i++){
 								positions.add(convertVbyteToNum(numbers.get(i)));
 							}
+							//System.out.println("id:"+docId+" freq: "+numbers.size());
 							//Add the doc and positions to the map
 							ret.put(docId, positions);
 							termLineLength-=(docLength + lengthByte.size());
 						}
+						break;
 					}
 				}
 
@@ -890,7 +950,9 @@ public class IndexerInvertedCompressed extends Indexer {
 		Query query = new Query("Morrow");
 		query.processQuery();
 		
-		DocumentIndexed nextdoc = (DocumentIndexed) index.nextDoc(query, 346);
+		DocumentIndexed nextdoc = (DocumentIndexed) index.nextDoc(query, -1);
+		System.out.println(nextdoc._docid+" "+nextdoc.bodySize);
+		nextdoc = (DocumentIndexed) index.nextDoc(query, nextdoc._docid);
 		System.out.println(nextdoc._docid+" "+nextdoc.bodySize);
 		//System.out.println(index.corpusTermFrequency("Web"));
 		/*
